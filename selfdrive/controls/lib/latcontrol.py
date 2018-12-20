@@ -33,7 +33,7 @@ class LatControl(object):
   def setup_mpc(self, steer_rate_cost):
     self.libmpc = libmpc_py.libmpc
     self.libmpc.init(MPC_COST_LAT.PATH, MPC_COST_LAT.LANE, MPC_COST_LAT.HEADING, steer_rate_cost)
-
+    
     self.mpc_solution = libmpc_py.ffi.new("log_t *")
     self.cur_state = libmpc_py.ffi.new("state_t *")
     self.mpc_updated = False
@@ -50,8 +50,8 @@ class LatControl(object):
     self.angle_steers_des_time = 0.0
 
     # For Variable Steering Ratio
-    self.lowSteerRatio = 9.0           # Set the lowest possible steering ratio allowed
-    self.vsrWindowLow = 0.1            # Set the tire/car angle low-end used for VSR (vsrWindowLow - is same as lowSteerRatio)
+    self.lowSteerRatio = 9.0           # Set the lowest steering ratio allowed
+    self.vsrWindowLow = 0.3            # Set the tire/car angle low-end used for VSR (vsrWindowLow - is same as lowSteerRatio)
     self.vsrWindowHigh = 0.65          # Set the tire/car angle high-end (vsrWindowHigh + is same as CP.steerRatio / interface.py)
     self.manual_Steering_Offset = 0.0  # Set a steering wheel offset. (Should this be * steering ratio to get the steering wheel angle?)
     self.variableSteerRatio = 0.0      # Used to store the calculated steering ratio
@@ -77,13 +77,22 @@ class LatControl(object):
       p_poly = libmpc_py.ffi.new("double[4]", list(PL.PP.p_poly))
 
       # Prius (and Prime) appears to have a variable steering ratio. Try to account for that
-      # Random maths:
+      # Applicable maths:
       #  https://www.desmos.com/calculator
       #  https://www.calculator.net/slope-calculator.html
       #  (steering wheel angle / steering ratio) = tire angle ..
       # So, if the calculation below is determining the tire angle, look for values under about 1.5 degrees
       self.angle_Check = angle_steers - angle_offset
-      if abs(self.angle_Check) < self.vsrWindowLow :                        # 0.3 degrees, for example
+      # Seems like a change to k_f in latcontrol is somewhat permanent so pull it every time
+      self.pid.k_f = CP.steerKf
+      if abs(self.angle_Check) < self.vsrWindowLow :  # 0.3 degrees, for example
+        # Is the remaining wandering a result of static friction somewhere in the steering mechanism?
+        #  The smallest force required to start motion, or to overcome static friction, is always greater than the force required to continue the motion.
+        # So, let's try breaking it loose at low angles
+        # I think small corrections are being issued by OP but aren't forceful enough to break static friction in Prius
+        # Eventually, a larger correction is needed which is enough to move the steering wheel
+        # Increase kf for this steering correction
+        self.pid.k_f *= 7.0       # Kf is currently set to 0.00008 so if that changes, may need to set a number here statically
         self.variableSteerRatio = self.lowSteerRatio                        # Use the lower ratio
       elif self.vsrWindowLow < abs(self.angle_Check) < self.vsrWindowHigh:  # The VSR transition zone
         # Begin the _variable_ part
@@ -93,6 +102,8 @@ class LatControl(object):
         self.vsrYIntercept = (CP.steerRatio - self.vsrSlope) * self.vsrWindowHigh
         # Use b to find y - (y = mx + b)
         self.variableSteerRatio = (self.vsrSlope * self.angle_Check) + self.vsrYIntercept
+        # Increase kf here also to a lesser degree. Could use slope intercept here also maybe
+        self.pid.k_f *= 3.0        # May need to play with this value more at 70mph
         if not self.lowSteerRatio <= self.variableSteerRatio <= CP.steerRatio:   # Sanity/safety check
           if self.variableSteerRatio < self.lowSteerRatio:
             self.variableSteerRatio = self.lowSteerRatio    # Reset to the low ratio
