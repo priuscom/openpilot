@@ -103,7 +103,7 @@ class LatControl(object):
         # Use b to find y - (y = mx + b)
         self.variableSteerRatio = (self.vsrSlope * self.angle_Check) + self.vsrYIntercept
         # Increase kf here also to a lesser degree. Could use slope intercept here also maybe
-        self.pid.k_f *= 3.0        # May need to play with this value more at 70mph
+        self.pid.k_f *= 1.0        # May need to play with this value more at 70mph
         if not self.lowSteerRatio <= self.variableSteerRatio <= CP.steerRatio:   # Sanity/safety check
           if self.variableSteerRatio < self.lowSteerRatio:
             self.variableSteerRatio = self.lowSteerRatio    # Reset to the low ratio
