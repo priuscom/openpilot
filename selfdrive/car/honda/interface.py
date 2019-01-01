@@ -8,8 +8,9 @@ from selfdrive.swaglog import cloudlog
 from selfdrive.config import Conversions as CV
 from selfdrive.controls.lib.drive_helpers import create_event, EventTypes as ET, get_events
 from selfdrive.controls.lib.vehicle_model import VehicleModel
-from selfdrive.car.honda.carstate import CarState, get_can_parser
-from selfdrive.car.honda.values import CruiseButtons, CM, BP, AH, CAR, HONDA_BOSCH
+from selfdrive.car.honda.carstate import CarState, get_can_parser, get_cam_can_parser
+from selfdrive.car.honda.values import CruiseButtons, CAR, HONDA_BOSCH, AUDIO_HUD, VISUAL_HUD
+from selfdrive.controls.lib.planner import _A_CRUISE_MAX_V_FOLLOWING
 
 try:
   from selfdrive.car.honda.carcontroller import CarController
@@ -20,6 +21,8 @@ except ImportError:
 # msgs sent for steering controller by camera module on can 0.
 # those messages are mutually exclusive on CRV and non-CRV cars
 CAMERA_MSGS = [0xe4, 0x194]
+
+A_ACC_MAX = max(_A_CRUISE_MAX_V_FOLLOWING)
 
 
 def compute_gb_honda(accel, speed):
@@ -86,8 +89,10 @@ class CarInterface(object):
     self.gas_pressed_prev = False
     self.brake_pressed_prev = False
     self.can_invalid_count = 0
+    self.cam_can_invalid_count = 0
 
     self.cp = get_can_parser(CP)
+    self.cp_cam = get_cam_can_parser(CP)
 
     # *** init the major players ***
     self.CS = CarState(CP)
@@ -105,6 +110,12 @@ class CarInterface(object):
 
   @staticmethod
   def calc_accel_override(a_ego, a_target, v_ego, v_target):
+
+    # normalized max accel. Allowing max accel at low speed causes speed overshoots
+    max_accel_bp = [10, 20]    # m/s
+    max_accel_v = [0.714, 1.0] # unit of max accel
+    max_accel = interp(v_ego, max_accel_bp, max_accel_v)
+
     # limit the pcm accel cmd if:
     # - v_ego exceeds v_target, or
     # - a_ego exceeds a_target and v_ego is close to v_target
@@ -127,7 +138,7 @@ class CarInterface(object):
     # accelOverride is more or less the max throttle allowed to pcm: usually set to a constant
     # unless aTargetMax is very high and then we scale with it; this help in quicker restart
 
-    return float(min(speedLimiter, accelLimiter))
+    return float(max(max_accel, a_target / A_ACC_MAX)) * min(speedLimiter, accelLimiter)
 
   @staticmethod
   def get_params(candidate, fingerprint):
@@ -140,10 +151,13 @@ class CarInterface(object):
       ret.safetyModel = car.CarParams.SafetyModels.hondaBosch
       ret.enableCamera = True
       ret.radarOffCan = True
+      ret.openpilotLongitudinalControl = False
     else:
       ret.safetyModel = car.CarParams.SafetyModels.honda
       ret.enableCamera = not any(x for x in CAMERA_MSGS if x in fingerprint)
       ret.enableGasInterceptor = 0x201 in fingerprint
+      ret.openpilotLongitudinalControl = ret.enableCamera
+
     cloudlog.warn("ECU Camera Simulated: %r", ret.enableCamera)
     cloudlog.warn("ECU Gas Interceptor: %r", ret.enableGasInterceptor)
 
@@ -294,12 +308,35 @@ class CarInterface(object):
       ret.wheelbase = 2.81
       ret.centerToFront = ret.wheelbase * 0.41
       ret.steerRatio = 16.0         # as spec
-      tire_stiffness_factor = 0.444 # not optimized yet
-      ret.steerKpV, ret.steerKiV = [[0.38], [0.11]]
       ret.longitudinalKpBP = [0., 5., 35.]
       ret.longitudinalKpV = [1.2, 0.8, 0.5]
       ret.longitudinalKiBP = [0., 35.]
       ret.longitudinalKiV = [0.18, 0.12]
+      #tire_stiffness_factor = 0.444 # not optimized yet  
+      tire_stiffness_factor = 0.82  # trying same as odyssey
+      #ret.steerKpV, ret.steerKiV = [[0.38], [0.11]] #original model: OS 30%, risetime: 1.75s, Max Output 0.8 of 1  
+      #ret.steerKpV, ret.steerKiV = [[0.38], [0.23]] #model: OS 10%,risetime 2.75s - RESULT: Better than default stock values.
+      #ret.steerKpV, ret.steerKiV = [[0.38], [0.3]]  #model: OS 5%, risetime 3.5s  - NOT TESTED
+      #ret.steerKpV, ret.steerKiV = [[0.38], [0.25]] #model: OS 7%, risetime 3s    - NOT TESTED
+      #ret.steerKpV, ret.steerKiV = [[0.38], [0.35]] #model: OS 2%, risetime 4s    - NOT TESTED
+      ret.steerKpV, ret.steerKiV = [[0.5], [0.22]]   #tweaking optimal result      - RESULT: Seems to fix slow / fast lane hug!
+      #ret.steerKpV, ret.steerKiV = [[0.5], [0.23]]  #model: OS 8%, risetime 2.75s - RESULT: Great centering on fast turns. Fixes fast lane but slow lane still hugs.
+      #ret.steerKpV, ret.steerKiV = [[0.5], [0.24]]  #tweaking optimal result      - RESULT: Does not fix slow lane hug
+      #ret.steerKpV, ret.steerKiV = [[0.5], [0.3]]   #model: OS 3%, risetime 3.5s  - NOT TESTED
+      #ret.steerKpV, ret.steerKiV = [[0.8], [0.23]]  #model: OS 5%, risetime 3s    - NOT TESTED
+      #ret.steerKpV, ret.steerKiV = [[0.8], [0.3]]   #model: OS 2%, risetime 3.8s  - RESULT: Fast lane left hugging recurrence. Wheel jiggles after fast turn.     
+      #ret.steerKpV, ret.steerKiV = [[1], [0.14]]    #model: OS 18%,risetime 2s    - NOT TESTED - CAUTION Large kP
+      #ret.steerKpV, ret.steerKiV = [[1.5], [0.2]]   #model: OS 5%, risetime 2.3s  - NOT TESTED - CAUTION Large kP
+      #ret.steerKpV, ret.steerKiV = [[2], [0.24]]    #model: OS 0%, risetime 3s    - NOT TESTED - CAUTION Large kP
+      #ret.steerKpV, ret.steerKiV = [[2], [0.21]]    #model: OS 3%, risetime 2.3s  - NOT TESTED - CAUTION Large kP
+      #ret.steerKf = 0.00009 # - NOT TESTED
+      #ret.steerKf = 0.00012 # - NOT TESTED - RESULT: 0.5,0.23 makes fast lane hug left side 
+      #ret.steerKf = 0.00015 # - NOT TESTED
+      #ret.steerKf = 0.00018 # - NOT TESTED
+      #ret.steerKf = 0.00021 # - NOT TESTED
+      #ret.steerKf = 0.00024 # - NOT TESTED
+      #ret.steerKf = 0.00027 # - NOT TESTED
+      #ret.steerKf = 0.00030 # - NOT TESTED
 
     elif candidate == CAR.RIDGELINE:
       stop_and_go = False
@@ -369,8 +406,9 @@ class CarInterface(object):
     canMonoTimes = []
 
     self.cp.update(int(sec_since_boot() * 1e9), False)
+    self.cp_cam.update(int(sec_since_boot() * 1e9), False)
 
-    self.CS.update(self.cp)
+    self.CS.update(self.cp, self.cp_cam)
 
     # create message
     ret = car.CarState.new_message()
@@ -417,6 +455,8 @@ class CarInterface(object):
     ret.cruiseState.available = bool(self.CS.main_on)
     ret.cruiseState.speedOffset = self.CS.cruise_speed_offset
     ret.cruiseState.standstill = False
+    
+    ret.readdistancelines = self.CS.read_distance_lines
 
     # TODO: button presses
     buttonEvents = []
@@ -471,10 +511,10 @@ class CarInterface(object):
       # TODO: more buttons?
       buttonEvents.append(be)
     ret.buttonEvents = buttonEvents
-
+    ret.gasbuttonstatus = self.CS.cstm_btns.get_button_status("gas")
     # events
-    # TODO: I don't like the way capnp does enums
-    # These strings aren't checked at compile time
+    # TODO: event names aren't checked at compile time.
+    # Maybe there is a way to use capnp enums directly
     events = []
     if not self.CS.can_valid:
       self.can_invalid_count += 1
@@ -482,6 +522,15 @@ class CarInterface(object):
         events.append(create_event('commIssue', [ET.NO_ENTRY, ET.IMMEDIATE_DISABLE]))
     else:
       self.can_invalid_count = 0
+
+    if not self.CS.cam_can_valid and self.CP.enableCamera:
+      self.cam_can_invalid_count += 1
+      # wait 1.0s before throwing the alert to avoid it popping when you turn off the car
+      if self.cam_can_invalid_count >= 100 and self.CS.CP.carFingerprint not in HONDA_BOSCH:
+        events.append(create_event('invalidGiraffeHonda', [ET.NO_ENTRY, ET.IMMEDIATE_DISABLE, ET.PERMANENT]))
+    else:
+      self.cam_can_invalid_count = 0
+
     if self.CS.steer_error:
       events.append(create_event('steerUnavailable', [ET.NO_ENTRY, ET.IMMEDIATE_DISABLE, ET.PERMANENT]))
     elif self.CS.steer_warning:
@@ -573,24 +622,8 @@ class CarInterface(object):
     else:
       hud_v_cruise = 255
 
-    hud_alert = {
-      "none": AH.NONE,
-      "fcw": AH.FCW,
-      "steerRequired": AH.STEER,
-      "brakePressed": AH.BRAKE_PRESSED,
-      "wrongGear": AH.GEAR_NOT_D,
-      "seatbeltUnbuckled": AH.SEATBELT,
-      "speedTooHigh": AH.SPEED_TOO_HIGH}[str(c.hudControl.visualAlert)]
-
-    snd_beep, snd_chime = {
-      "none": (BP.MUTE, CM.MUTE),
-      "beepSingle": (BP.SINGLE, CM.MUTE),
-      "beepTriple": (BP.TRIPLE, CM.MUTE),
-      "beepRepeated": (BP.REPEATED, CM.MUTE),
-      "chimeSingle": (BP.MUTE, CM.SINGLE),
-      "chimeDouble": (BP.MUTE, CM.DOUBLE),
-      "chimeRepeated": (BP.MUTE, CM.REPEATED),
-      "chimeContinuous": (BP.MUTE, CM.CONTINUOUS)}[str(c.hudControl.audibleAlert)]
+    hud_alert = VISUAL_HUD[c.hudControl.visualAlert.raw]
+    snd_beep, snd_chime = AUDIO_HUD[c.hudControl.audibleAlert.raw]
 
     pcm_accel = int(clip(c.cruiseControl.accelOverride,0,1)*0xc6)
 
