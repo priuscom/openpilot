@@ -13,6 +13,9 @@ class PathPlanner(object):
     self.last_model = 0.
     self.lead_dist, self.lead_prob, self.lead_var = 0, 0, 1
     self._path_pinv = compute_path_pinv()
+    self.left_change = 0.0
+    self.right_change = 0.0
+    self.path_change = 0.0
 
     self.lane_width_estimate = 3.7
     self.lane_width_certainty = 1.0
@@ -45,6 +48,16 @@ class PathPlanner(object):
       l_prob = md.model.leftLane.prob  # left line prob
       r_prob = md.model.rightLane.prob  # right line prob
 
+      if self.c_prob != 0:
+        LaC.left_change = l_poly[3] - self.l_poly[3]
+        LaC.right_change = r_poly[3] - self.r_poly[3]
+
+      #  if LaC.left_change > LaC.right_change:
+      #    if abs(LaC.left_change > LaC.right_change):
+      #      l_prob *= (LaC.left_change - LaC.right_change) / LaC.right_change
+      #    else:
+      #      r_prob *= np.clip(abs(LaC.left_change) / abs(LaC.right_change), 0.0, 1.0)
+
       # Find current lanewidth
       lr_prob = l_prob * r_prob
       self.lane_width_certainty += 0.05 * (lr_prob - self.lane_width_certainty)
@@ -57,7 +70,7 @@ class PathPlanner(object):
       lane_width_diff = abs(self.lane_width - current_lane_width)
       lane_r_prob = interp(lane_width_diff, [0.3, 1.0], [1.0, 0.0])
 
-      r_prob *= lane_r_prob
+      #r_prob *= lane_r_prob
 
       self.lead_dist = md.model.lead.dist
       self.lead_prob = md.model.lead.prob
