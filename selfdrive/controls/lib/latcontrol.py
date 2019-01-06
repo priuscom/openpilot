@@ -65,13 +65,21 @@ class LatControl(object):
     self.right_change = 0.0
     self.path_change = 0.0
     self.prob_adjust = 0.0
+    self.steer_counter = 1.0
+    self.steer_counter_prev = 0.0
+    self.angle_steers = 0.0
+    self.angle_steers_rate = 0.0
+    self.rough_steers_rate = 0.0
+    self.rough_steers_rate_increment = 0.0
+    self.prev_angle_steers = 0.0
+    self.calculate_rate = True
 
     # variables for dashboarding
     self.context = zmq.Context()
     self.steerpub = self.context.socket(zmq.PUB)
     self.steerpub.bind("tcp://*:8594")
     self.influxString = 'steerData3,testName=none,active=%s,ff_type=%s ff_type_a=%s,ff_type_r=%s,steer_status=%s,' \
-                    'steering_control_active=%s,steer_stock_torque=%s,steer_stock_torque_request=%s,lchange=%s,pchange=%s,rchange=%s,d0=%s,d1=%s,d2=%s,' \
+                    'steering_control_active=%s,steer_stock_torque=%s,steer_stock_torque_request=%s,can_rate=%s,lchange=%s,pchange=%s,rchange=%s,d0=%s,d1=%s,d2=%s,' \
                     'd3=%s,d4=%s,d5=%s,d6=%s,d7=%s,d8=%s,d9=%s,d10=%s,d11=%s,d12=%s,d13=%s,d14=%s,d15=%s,d16=%s,d17=%s,d18=%s,d19=%s,d20=%s,' \
                     'accel_limit=%s,restricted_steer_rate=%s,driver_torque=%s,angle_rate_desired=%s,future_angle_steers=%s,' \
                     'angle_rate=%s,angle_steers=%s,angle_steers_des=%s,self.angle_steers_des_mpc=%s,projected_angle_steers_des=%s,steerRatio=%s,l_prob=%s,' \
@@ -105,21 +113,39 @@ class LatControl(object):
   def update(self, active, v_ego, angle_steers, angle_rate, steer_override, d_poly, angle_offset, CP, VM, PL):
     self.mpc_updated = False
 
+    CAN_RATE = angle_rate
+    angle_rate = 0.0
+
+    if angle_rate != 0.0 and self.calculate_rate:
+      if angle_steers != self.prev_angle_steers:
+        self.steer_counter_prev = self.steer_counter
+        self.rough_steers_rate = 100.0 * (angle_steers - self.prev_angle_steers) / self.steer_counter_prev
+        self.steer_counter = 0.0
+      self.steer_counter += 1.0
+
+      if self.steer_counter > self.steer_counter_prev:
+        self.rough_steers_rate = (self.steer_counter * self.rough_steers_rate) / (self.steer_counter + 1.0)
+
+      angle_rate = self.rough_steers_rate
+    else:
+      self.calculate_rate = False
+
     # TODO: this creates issues in replay when rewinding time: mpc won't run
     if self.last_mpc_ts < PL.last_md_ts:
-      cur_time = sec_since_boot()
       self.last_mpc_ts = PL.last_md_ts
+      cur_time = sec_since_boot()
+      mpc_time = float(self.last_mpc_ts / 1000000000.0)
 
       self.curvature_factor = VM.curvature_factor(v_ego)
 
       # Use steering rate from the last 2 samples to estimate acceleration for a more realistic future steering rate
-      accelerated_angle_rate = 2.0 * angle_rate - self.prev_angle_rate
+      accelerated_angle_rate = angle_rate   # 2.0 * angle_rate - self.prev_angle_rate
 
       # Determine future angle steers using accelerated steer rate
       self.projected_angle_steers = float(angle_steers) + CP.steerActuatorDelay * float(accelerated_angle_rate)
 
       # Determine a proper delay time that includes the model's processing time, which is variable
-      plan_age = cur_time - float(self.last_mpc_ts / 1000000000.0)
+      plan_age = cur_time - mpc_time
       total_delay = CP.steerActuatorDelay + plan_age
 
       self.l_poly = libmpc_py.ffi.new("double[4]", list(PL.PP.l_poly))
@@ -144,8 +170,8 @@ class LatControl(object):
                           float(math.degrees(self.mpc_solution[0].delta[2] * CP.steerRatio) + angle_offset)]
 
         self.mpc_times = [self.angle_steers_des_time,
-                        float(self.last_mpc_ts / 1000000000.0) + _DT_MPC,
-                        float(self.last_mpc_ts / 1000000000.0) + _DT_MPC + _DT_MPC]
+                          mpc_time + _DT_MPC,
+                          mpc_time + _DT_MPC + _DT_MPC]
 
         self.angle_steers_des_mpc = self.mpc_angles[1]
       else:
@@ -229,9 +255,9 @@ class LatControl(object):
       capture_all = True
       if self.mpc_updated or capture_all:
         self.frames += 1
-        self.steerdata += ("%d,%s,%d,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%d|" % (1, \
+        self.steerdata += ("%d,%s,%d,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%d|" % (1, \
         ff_type, 1 if ff_type == "a" else 0, 1 if ff_type == "r" else 0, steer_status, steering_control_active, steer_stock_torque, steer_stock_torque_request, \
-        self.left_change, self.path_change, self.right_change, self.mpc_solution[0].delta[0], self.mpc_solution[0].delta[1], self.mpc_solution[0].delta[2], self.mpc_solution[0].delta[3], self.mpc_solution[0].delta[4], \
+        CAN_RATE, self.left_change, self.path_change, self.right_change, self.mpc_solution[0].delta[0], self.mpc_solution[0].delta[1], self.mpc_solution[0].delta[2], self.mpc_solution[0].delta[3], self.mpc_solution[0].delta[4], \
         self.mpc_solution[0].delta[5], self.mpc_solution[0].delta[6], self.mpc_solution[0].delta[7], self.mpc_solution[0].delta[8], self.mpc_solution[0].delta[9], \
         self.mpc_solution[0].delta[10], self.mpc_solution[0].delta[11], self.mpc_solution[0].delta[12], self.mpc_solution[0].delta[13], self.mpc_solution[0].delta[14], \
         self.mpc_solution[0].delta[15], self.mpc_solution[0].delta[16], self.mpc_solution[0].delta[17], self.mpc_solution[0].delta[18], self.mpc_solution[0].delta[19], self.mpc_solution[0].delta[20], \
@@ -244,6 +270,7 @@ class LatControl(object):
 
     self.sat_flag = self.pid.saturated
     self.prev_angle_rate = angle_rate
+    self.prev_angle_steers = angle_steers
 
     if CP.steerControlType == car.CarParams.SteerControlType.torque:
       return output_steer, float(self.angle_steers_des_mpc)
