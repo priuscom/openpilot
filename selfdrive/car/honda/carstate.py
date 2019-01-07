@@ -240,6 +240,8 @@ class CarState(object):
       self.user_gas_pressed = self.user_gas > 0 # this works because interceptor read < 0 when pedal position is 0. Once calibrated, this will change
 
     self.gear = 0 if self.CP.carFingerprint == CAR.CIVIC else cp.vl["GEARBOX"]['GEAR']
+
+    # Apply the reported angle offset for cars that have it defined
     if self.CP.carFingerprint in  (CAR.CIVIC, CAR.ODYSSEY, CAR.CRV_5G, CAR.ACCORD, CAR.ACCORD_15, CAR.ACCORDH, CAR.CIVIC_HATCH):
       self.angle_steers = cp.vl["STEERING_SENSORS"]['STEER_ANGLE'] + cp.vl["STEERING_SENSORS"]['STEER_ANGLE_OFFSET']
     else:
