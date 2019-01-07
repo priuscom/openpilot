@@ -1,4 +1,4 @@
-import zmq
+import math
 import numpy as np
 from selfdrive.controls.lib.pid import PIController
 from selfdrive.controls.lib.drive_helpers import MPC_COST_LAT
@@ -43,7 +43,6 @@ class LatControl(object):
     KpV = [np.interp(25.0, CP.steerKpBP, CP.steerKpV) * _ADJUST_REACTANCE]
     KiV = [np.interp(25.0, CP.steerKiBP, CP.steerKiV) * _ADJUST_REACTANCE]
     Kf = CP.steerKf * _ADJUST_INDUCTANCE
-    print(KpV, KiV, Kf)
     self.pid = PIController(([0.], KpV),
                             ([0.], KiV),
                             k_f=Kf, pos_limit=1.0)
