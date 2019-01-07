@@ -57,7 +57,6 @@ class LatControl(object):
     self.feed_forward = 0.0
     self.last_mpc_ts = 0.0
     self.angle_steers_des = 0.0
-    self.angle_steers_des_mpc = 0.0
     self.angle_steers_des_time = 0.0
     self.projected_angle_steers = 0.0
     self.steer_counter = 1.0
@@ -144,9 +143,6 @@ class LatControl(object):
         self.mpc_times = [self.angle_steers_des_time,
                           mpc_time + _DT_MPC,
                           mpc_time + _DT_MPC + _DT_MPC]
-
-        # Is this property used outside of LaC?
-        self.angle_steers_des_mpc = self.mpc_angles[1]
       else:
         self.libmpc.init(MPC_COST_LAT.PATH, MPC_COST_LAT.LANE, MPC_COST_LAT.HEADING, CP.steerRateCost)
         self.cur_state[0].delta = math.radians(angle_steers) / CP.steerRatio
@@ -187,8 +183,8 @@ class LatControl(object):
       deadzone = 0.0
 
       if CP.steerControlType == car.CarParams.SteerControlType.torque:
-        # Decide which feed forward mode should be used (angle or rate).  Use more dominant mode, and only if conditions are met
-        # Spread feed forward out over a period of time to make it more inductive (for resonance)
+        # Decide which feed forward mode should be used (angle or rate).  Use more dominant mode, but only if conditions are met
+        # Spread feed forward out over a period of time to make it inductive (for resonance)
         if abs(self.ff_rate_factor * float(restricted_steer_rate)) > abs(self.ff_angle_factor * float(self.angle_steers_des) - float(angle_offset)) - 0.5 \
             and (abs(float(restricted_steer_rate)) > abs(accelerated_angle_rate) or (float(restricted_steer_rate) < 0) != (accelerated_angle_rate < 0)) \
             and (float(restricted_steer_rate) < 0) == (float(self.angle_steers_des) - float(angle_offset) - 0.5 < 0):
@@ -209,6 +205,6 @@ class LatControl(object):
 
     # return MPC angle in the unused output (for ALCA)
     if CP.steerControlType == car.CarParams.SteerControlType.torque:
-      return output_steer, float(self.angle_steers_des_mpc)
+      return output_steer, self.mpc_angles[1]
     else:
-      return float(self.angle_steers_des_mpc), float(self.angle_steers_des)
+      return self.mpc_angles[1], float(self.angle_steers_des)
