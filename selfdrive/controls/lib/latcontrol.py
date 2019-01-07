@@ -112,8 +112,6 @@ class LatControl(object):
 
   def update(self, active, v_ego, angle_steers, angle_rate, steer_override, d_poly, angle_offset, CP, VM, PL):
     self.mpc_updated = False
-    CAN_RATE = angle_rate
-    angle_rate = 0.0
 
     if angle_rate == 0.0 and self.calculate_rate:
       if angle_steers != self.prev_angle_steers:
@@ -125,70 +123,61 @@ class LatControl(object):
       if self.steer_counter > self.steer_counter_prev:
         self.rough_steers_rate = (self.steer_counter * self.rough_steers_rate) / (self.steer_counter + 1.0)
 
-      if int(sec_since_boot()) % 20 < 10:
-        angle_rate = CAN_RATE
-        CAN_RATE = self.rough_steers_rate
-        # Use steering rate from the last 2 samples to estimate acceleration for a more realistic future steering rate
-        accelerated_angle_rate = 2.0 * angle_rate - self.prev_angle_rate
-      else:
-        angle_rate = self.rough_steers_rate
-        accelerated_angle_rate = angle_rate
+      angle_rate = self.rough_steers_rate
+      accelerated_angle_rate = angle_rate
 
     else:
+      # Use steering rate from the last 2 samples to estimate acceleration for a more realistic future steering rate
+      accelerated_angle_rate = 2.0 * angle_rate - self.prev_angle_rate
       self.calculate_rate = False
 
     # TODO: this creates issues in replay when rewinding time: mpc won't run
     if self.last_mpc_ts < PL.last_md_ts:  # and PL.last_md_ts - self.last_mpc_ts > 40000000:
-
-      #self.mpc_frame += 1
-
       self.last_mpc_ts = PL.last_md_ts
-
       cur_time = sec_since_boot()
       mpc_time = float(self.last_mpc_ts / 1000000000.0)
-      if self.mpc_frame % 2 == 0:
-        self.curvature_factor = VM.curvature_factor(v_ego)
+      self.curvature_factor = VM.curvature_factor(v_ego)
 
-        # Determine future angle steers using accelerated steer rate
-        self.projected_angle_steers = float(angle_steers) + CP.steerActuatorDelay * float(angle_rate)
+      # Determine future angle steers using accelerated steer rate
+      self.projected_angle_steers = float(angle_steers) + CP.steerActuatorDelay * float(angle_rate)
 
-        # Determine a proper delay time that includes the model's processing time, which is variable
-        plan_age = cur_time - mpc_time
-        total_delay = CP.steerActuatorDelay + plan_age
+      # Determine a proper delay time that includes the model's processing time, which is variable
+      plan_age = cur_time - mpc_time
+      total_delay = CP.steerActuatorDelay + plan_age
 
-        self.l_poly = libmpc_py.ffi.new("double[4]", list(PL.PP.l_poly))
-        self.r_poly = libmpc_py.ffi.new("double[4]", list(PL.PP.r_poly))
-        self.p_poly = libmpc_py.ffi.new("double[4]", list(PL.PP.p_poly))
+      self.l_poly = libmpc_py.ffi.new("double[4]", list(PL.PP.l_poly))
+      self.r_poly = libmpc_py.ffi.new("double[4]", list(PL.PP.r_poly))
+      self.p_poly = libmpc_py.ffi.new("double[4]", list(PL.PP.p_poly))
 
-        # account for actuation delay and the age of the plan
-        self.cur_state = calc_states_after_delay(self.cur_state, v_ego, self.projected_angle_steers, self.curvature_factor, CP.steerRatio, total_delay)
+      # account for actuation delay and the age of the plan
+      self.cur_state = calc_states_after_delay(self.cur_state, v_ego, self.projected_angle_steers, self.curvature_factor, CP.steerRatio, total_delay)
 
-        v_ego_mpc = max(v_ego, 5.0)  # avoid mpc roughness due to low speed
-        self.libmpc.run_mpc(self.cur_state, self.mpc_solution,
-                            self.l_poly, self.r_poly, self.p_poly,
-                            PL.PP.l_prob, PL.PP.r_prob, PL.PP.p_prob, self.curvature_factor, v_ego_mpc, PL.PP.lane_width)
+      v_ego_mpc = max(v_ego, 5.0)  # avoid mpc roughness due to low speed
+      self.libmpc.run_mpc(self.cur_state, self.mpc_solution,
+                          self.l_poly, self.r_poly, self.p_poly,
+                          PL.PP.l_prob, PL.PP.r_prob, PL.PP.p_prob, self.curvature_factor, v_ego_mpc, PL.PP.lane_width)
 
-        self.mpc_updated = True
+      self.mpc_updated = True
 
-        #  Check for infeasable MPC solution
-        self.mpc_nans = np.any(np.isnan(list(self.mpc_solution[0].delta)))
-        if not self.mpc_nans:
-          self.mpc_angles = [self.angle_steers_des,
-                            float(math.degrees(self.mpc_solution[0].delta[1] * CP.steerRatio) + angle_offset),
-                            float(math.degrees(self.mpc_solution[0].delta[2] * CP.steerRatio) + angle_offset)]
+      #  Check for infeasable MPC solution
+      self.mpc_nans = np.any(np.isnan(list(self.mpc_solution[0].delta)))
+      if not self.mpc_nans:
+        self.mpc_angles = [self.angle_steers_des,
+                          float(math.degrees(self.mpc_solution[0].delta[1] * CP.steerRatio) + angle_offset),
+                          float(math.degrees(self.mpc_solution[0].delta[2] * CP.steerRatio) + angle_offset)]
 
-          self.mpc_times = [self.angle_steers_des_time,
-                            mpc_time + _DT_MPC,
-                            mpc_time + _DT_MPC + _DT_MPC]
+        self.mpc_times = [self.angle_steers_des_time,
+                          mpc_time + _DT_MPC,
+                          mpc_time + _DT_MPC + _DT_MPC]
 
-          self.angle_steers_des_mpc = self.mpc_angles[1]
-        else:
-          self.libmpc.init(MPC_COST_LAT.PATH, MPC_COST_LAT.LANE, MPC_COST_LAT.HEADING, CP.steerRateCost)
-          self.cur_state[0].delta = math.radians(angle_steers) / CP.steerRatio
+        self.angle_steers_des_mpc = self.mpc_angles[1]
+      else:
+        self.libmpc.init(MPC_COST_LAT.PATH, MPC_COST_LAT.LANE, MPC_COST_LAT.HEADING, CP.steerRateCost)
+        self.cur_state[0].delta = math.radians(angle_steers) / CP.steerRatio
 
-          if cur_time > self.last_cloudlog_t + 5.0:
-            self.last_cloudlog_t = cur_time
-            cloudlog.warning("Lateral mpc - nan: True")
+        if cur_time > self.last_cloudlog_t + 5.0:
+          self.last_cloudlog_t = cur_time
+          cloudlog.warning("Lateral mpc - nan: True")
 
     elif self.frames > 0:
       self.steerpub.send(self.steerdata)
