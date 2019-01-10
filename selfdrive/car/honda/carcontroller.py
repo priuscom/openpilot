@@ -140,10 +140,19 @@ class CarController(object):
     else:
       STEER_MAX = 0x1000
 
+    if abs(actuators.steer) < 1.0:
+      if frame % 4 < 2:
+        ateer_vibrate = 1.3
+      else:
+        ateer_vibrate = 0.7
+    else:
+      ateer_vibrate = 1.0
+
     # steer torque is converted back to CAN reference (positive when steering right)
     apply_gas = clip(actuators.gas, 0., 1.)
     apply_brake = int(clip(self.brake_last * BRAKE_MAX, 0, BRAKE_MAX - 1))
-    apply_steer = int(clip(-actuators.steer * STEER_MAX, -STEER_MAX, STEER_MAX))
+    apply_steer = int(clip(-(actuators.steer * ateer_vibrate) * STEER_MAX, -STEER_MAX, STEER_MAX))
+    print(apply_steer)
 
     lkas_active = enabled and not CS.steer_not_allowed
 
