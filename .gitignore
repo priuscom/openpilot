@@ -32,7 +32,3 @@ selfdrive/test/tests/plant/out
 /src/
 
 one
-
-.vscode/*.json
-launch_chffrplus.sh
-
