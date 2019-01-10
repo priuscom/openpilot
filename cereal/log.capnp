@@ -556,6 +556,12 @@ struct Plan {
   aTarget @18 :Float32;
   jerkFactor @6 :Float32;
   hasLead @7 :Bool;
+  hasLeftLane @23 :Bool;
+  hasRightLane @24 :Bool;
+
+  hasleftLaneDepart @25 :Bool;
+  hasrightLaneDepart @26 :Bool;
+
   fcw @8 :Bool;
   longitudinalPlanSource @15 :LongitudinalPlanSource;
 
@@ -1586,6 +1592,10 @@ struct LiveMapData {
   distToTurn @10 :Float32;
 }
 
+struct LatControl {
+  anglelater @0 :Float32;
+}
+
 
 struct Event {
   # in nanoseconds?
@@ -1654,5 +1664,6 @@ struct Event {
     boot @60 :Boot;
     liveParameters @61 :LiveParametersData;
     liveMapData @62 :LiveMapData;
+    latControl @63 :LatControl;
   }
 }
