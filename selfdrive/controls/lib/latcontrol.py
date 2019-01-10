@@ -104,6 +104,11 @@ class LatControl(object):
     self.cur_state[0].y = 0.0
     self.cur_state[0].psi = 0.0
     self.cur_state[0].delta = 0.0
+    self.massage = 0.0
+    self.massageDirection = 0.0
+    self.massageStep = 0.0001
+    self.massagePeriod = 10.0
+    self.massagePeriodStep = 0.01
 
   def reset(self):
     self.pid.reset()
@@ -270,8 +275,16 @@ class LatControl(object):
     self.sat_flag = self.pid.saturated
     self.prev_angle_rate = angle_rate
     self.prev_angle_steers = angle_steers
+    if self.frames % int(self.massagePeriod) < int(self.massagePeriod) / 2:
+      self.massage += self.massageStep
+    else:
+      self.massage -= self.massageStep
+    self.massageDirection *= -1.0
+    if self.frames % int(self.massagePeriod) == 0:
+      self.massagePeriodStep += 0.01
 
     if CP.steerControlType == car.CarParams.SteerControlType.torque:
       return output_steer, float(self.angle_steers_des_mpc)
+      #return (self.massage * self.massageDirection) + output_steer, float(self.angle_steers_des_mpc)
     else:
       return float(self.angle_steers_des_mpc), float(self.angle_steers_des)
