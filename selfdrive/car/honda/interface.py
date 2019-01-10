@@ -232,9 +232,9 @@ class CarInterface(object):
       tire_stiffness_factor = 0.8467
       ret.steerReactance = 1.0
       ret.steerInductance = 1.0
-      ret.steerResistance = 1.0
+      ret.steerResistance = 0.5
       ret.eonToFront = 1.0
-      ret.steerKpV, ret.steerKiV = [[0.8], [0.24]]
+      ret.steerKpV, ret.steerKiV = [[0.65], [0.20]]
       ret.longitudinalKpBP = [0., 5., 35.]
       ret.longitudinalKpV = [1.2, 0.8, 0.5]
       ret.longitudinalKiBP = [0., 35.]

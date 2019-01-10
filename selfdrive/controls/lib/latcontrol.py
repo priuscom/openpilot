@@ -13,10 +13,9 @@ from cereal import car
 
 _DT = 0.01    # 100Hz
 _DT_MPC = 0.05  # 20Hz
-_LONGITUDINAL_CAMERA_OFFSET = 1.0
 
-def calc_states_after_delay(states, v_ego, steer_angle, curvature_factor, steer_ratio, delay):
-  states[0].x = v_ego * delay + _LONGITUDINAL_CAMERA_OFFSET
+def calc_states_after_delay(states, v_ego, steer_angle, curvature_factor, steer_ratio, delay, long_offset):
+  states[0].x = v_ego * delay + long_offset
   states[0].psi = v_ego * curvature_factor * math.radians(steer_angle) / steer_ratio * delay
   return states
 
@@ -153,9 +152,7 @@ class LatControl(object):
       self.p_poly = libmpc_py.ffi.new("double[4]", list(PL.PP.p_poly))
 
       # account for actuation delay and the age of the plan
-      self.cur_state = calc_states_after_delay(self.cur_state, v_ego, self.projected_angle_steers, self.curvature_factor, CP.steerRatio, total_delay)
-      #self.cur_state = calc_states_after_delay(self.cur_state, v_ego, self.projected_angle_steers, self.curvature_factor, CP.steerRatio, CP.steerActuatorDelay)
-      #self.cur_state = calc_states_after_delay(self.cur_state, v_ego, angle_steers, self.curvature_factor, CP.steerRatio, CP.steerActuatorDelay)
+      self.cur_state = calc_states_after_delay(self.cur_state, v_ego, self.projected_angle_steers, self.curvature_factor, CP.steerRatio, total_delay, self.longCameraOffset)
 
       v_ego_mpc = max(v_ego, 5.0)  # avoid mpc roughness due to low speed
       self.libmpc.run_mpc(self.cur_state, self.mpc_solution,
@@ -176,7 +173,6 @@ class LatControl(object):
                           mpc_time + _DT_MPC + _DT_MPC]
 
         self.angle_steers_des_mpc = self.mpc_angles[1]
-        #self.cur_state[0].delta = self.mpc_solution[0].delta[1]
 
       else:
         self.libmpc.init(MPC_COST_LAT.PATH, MPC_COST_LAT.LANE, MPC_COST_LAT.HEADING, CP.steerRateCost)
