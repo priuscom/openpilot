@@ -279,12 +279,13 @@ class LatControl(object):
       self.massage += self.massageStep
     else:
       self.massage -= self.massageStep
+    self.massage = np.clip(self.massage, -abs(1.0 - output_steer), abs((1.0 - output_steer)))
     self.massageDirection *= -1.0
     if self.frames % int(self.massagePeriod) == 0:
       self.massagePeriodStep += 0.01
 
     if CP.steerControlType == car.CarParams.SteerControlType.torque:
-      return output_steer, float(self.angle_steers_des_mpc)
-      #return (self.massage * self.massageDirection) + output_steer, float(self.angle_steers_des_mpc)
+      #return output_steer, float(self.angle_steers_des_mpc)
+      return float(np.clip(self.massage * self.massageDirection + output_steer, -1.0, 1.0)) , float(self.angle_steers_des_mpc)
     else:
       return float(self.angle_steers_des_mpc), float(self.angle_steers_des)
