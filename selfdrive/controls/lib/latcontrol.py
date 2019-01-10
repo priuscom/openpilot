@@ -12,8 +12,8 @@ _DT = 0.01    # 100Hz
 _DT_MPC = 0.05  # 20Hz
 
 
-def calc_states_after_delay(states, v_ego, steer_angle, curvature_factor, steer_ratio, delay):
-  states[0].x = v_ego * delay
+def calc_states_after_delay(states, v_ego, steer_angle, curvature_factor, steer_ratio, delay, long_camera_offset):
+  states[0].x = v_ego * delay + long_camera_offset
   states[0].psi = v_ego * curvature_factor * math.radians(steer_angle) / steer_ratio * delay
   return states
 
@@ -35,22 +35,18 @@ def apply_deadzone(angle, deadzone):
 class LatControl(object):
   def __init__(self, CP):
 
-    _ADJUST_REACTANCE = 1.0
-    _ADJUST_INDUCTANCE = 1.0
-    _ADJUST_RESISTANCE = 1.0
-
     # Eliminate break-points, since they aren't needed (and would cause problems for resonance)
-    KpV = [np.interp(25.0, CP.steerKpBP, CP.steerKpV) * _ADJUST_REACTANCE]
-    KiV = [np.interp(25.0, CP.steerKiBP, CP.steerKiV) * _ADJUST_REACTANCE]
-    Kf = CP.steerKf * _ADJUST_INDUCTANCE
+    KpV = [np.interp(25.0, CP.steerKpBP, CP.steerKpV) * CP.steerReactance]
+    KiV = [np.interp(25.0, CP.steerKiBP, CP.steerKiV) * CP.steerReactance]
+    Kf = CP.steerKf * CP.steerInductance
     self.pid = PIController(([0.], KpV),
                             ([0.], KiV),
                             k_f=Kf, pos_limit=1.0)
     self.last_cloudlog_t = 0.0
     self.setup_mpc(CP.steerRateCost)
-    self.smooth_factor = _ADJUST_INDUCTANCE * 2.0 * CP.steerActuatorDelay / _DT    # Multiplier for inductive component (feed forward)
-    self.projection_factor = _ADJUST_REACTANCE * 5.0 * _DT                         #  Mutiplier for reactive component (PI)
-    self.accel_limit = 2.0 / _ADJUST_RESISTANCE                                    # Desired acceleration limit to prevent "whip steer" (resistive component)
+    self.smooth_factor = CP.steerInductance * 2.0 * CP.steerActuatorDelay / _DT    # Multiplier for inductive component (feed forward)
+    self.projection_factor = CP.steerReactance * 5.0 * _DT                         # Mutiplier for reactive component (PI)
+    self.accel_limit = 2.0 / CP.steerResistance                                    # Desired acceleration limit to prevent "whip steer" (resistive component)
     self.ff_angle_factor = 0.5                                                     # Kf multiplier for angle-based feed forward
     self.ff_rate_factor = 5.0                                                      # Kf multiplier for rate-based feed forward
     self.prev_angle_rate = 0
@@ -58,6 +54,7 @@ class LatControl(object):
     self.last_mpc_ts = 0.0
     self.angle_steers_des = 0.0
     self.angle_steers_des_time = 0.0
+    self.angle_steers_des_mpc = 0.0
     self.projected_angle_steers = 0.0
     self.steer_counter = 1.0
     self.steer_counter_prev = 0.0
@@ -89,7 +86,7 @@ class LatControl(object):
     if angle_rate == 0.0 and self.calculate_rate:
       if angle_steers != self.prev_angle_steers:
         self.steer_counter_prev = self.steer_counter
-        self.rough_steers_rate = 100.0 * (angle_steers - self.prev_angle_steers) / self.steer_counter_prev
+        self.rough_steers_rate = (self.rough_steers_rate + 100.0 * (angle_steers - self.prev_angle_steers) / self.steer_counter_prev) / 2.0
         self.steer_counter = 0.0
       elif self.steer_counter >= self.steer_counter_prev:
         self.rough_steers_rate = (self.steer_counter * self.rough_steers_rate) / (self.steer_counter + 1.0)
@@ -112,10 +109,10 @@ class LatControl(object):
       curvature_factor = VM.curvature_factor(v_ego)
 
       # Determine future angle steers using steer rate
-      projected_angle_steers = float(angle_steers) + CP.steerActuatorDelay * float(angle_rate)
+      projected_angle_steers = float(angle_steers) + CP.steerActuatorDelay * float(accelerated_angle_rate)
 
       # Determine a proper delay time that includes the model's variable processing time
-      plan_age = cur_time - mpc_time
+      plan_age = _DT_MPC + cur_time - mpc_time
       total_delay = CP.steerActuatorDelay + plan_age
 
       l_poly = libmpc_py.ffi.new("double[4]", list(PL.PP.l_poly))
@@ -123,8 +120,8 @@ class LatControl(object):
       p_poly = libmpc_py.ffi.new("double[4]", list(PL.PP.p_poly))
 
       # account for actuation delay and the age of the plan
-      self.cur_state = calc_states_after_delay(self.cur_state, v_ego, projected_angle_steers,
-                                curvature_factor, CP.steerRatio, total_delay)
+      self.cur_state = calc_states_after_delay(self.cur_state, v_ego, projected_angle_steers, curvature_factor,
+                                                      CP.steerRatio, total_delay, CP.eonToFront)
 
       v_ego_mpc = max(v_ego, 5.0)  # avoid mpc roughness due to low speed
       self.libmpc.run_mpc(self.cur_state, self.mpc_solution,
@@ -143,6 +140,8 @@ class LatControl(object):
         self.mpc_times = [self.angle_steers_des_time,
                           mpc_time + _DT_MPC,
                           mpc_time + _DT_MPC + _DT_MPC]
+
+        self.angle_steers_des_mpc = self.mpc_angles[1]
       else:
         self.libmpc.init(MPC_COST_LAT.PATH, MPC_COST_LAT.LANE, MPC_COST_LAT.HEADING, CP.steerRateCost)
         self.cur_state[0].delta = math.radians(angle_steers) / CP.steerRatio
