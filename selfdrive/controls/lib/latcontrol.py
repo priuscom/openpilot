@@ -33,7 +33,7 @@ class LatControl(object):
   def setup_mpc(self, steer_rate_cost):
     self.libmpc = libmpc_py.libmpc
     self.libmpc.init(MPC_COST_LAT.PATH, MPC_COST_LAT.LANE, MPC_COST_LAT.HEADING, steer_rate_cost)
-
+    
     self.mpc_solution = libmpc_py.ffi.new("log_t *")
     self.cur_state = libmpc_py.ffi.new("state_t *")
     self.mpc_updated = False
@@ -48,6 +48,16 @@ class LatControl(object):
     self.angle_steers_des_mpc = 0.0
     self.angle_steers_des_prev = 0.0
     self.angle_steers_des_time = 0.0
+
+    # For Variable Steering Ratio
+    self.lowSteerRatio = 9.0           # Set the lowest steering ratio allowed
+    self.vsrWindowLow = 0.3            # Set the tire/car angle low-end used for VSR (vsrWindowLow - is same as lowSteerRatio)
+    self.vsrWindowHigh = 0.65          # Set the tire/car angle high-end (vsrWindowHigh + is same as CP.steerRatio / interface.py)
+    self.manual_Steering_Offset = 0.0  # Set a steering wheel offset. (Should this be * steering ratio to get the steering wheel angle?)
+    self.variableSteerRatio = 0.0      # Used to store the calculated steering ratio
+    self.angle_Check = 0.0             # Used for desired tire/car angle
+    self.vsrSlope = 0.0                # Used for slope intercept formula
+    self.vsrYIntercept = 0.0           # Used for slope intercept formula
 
   def reset(self):
     self.pid.reset()
@@ -66,8 +76,44 @@ class LatControl(object):
       r_poly = libmpc_py.ffi.new("double[4]", list(PL.PP.r_poly))
       p_poly = libmpc_py.ffi.new("double[4]", list(PL.PP.p_poly))
 
+      # Prius (and Prime) appears to have a variable steering ratio. Try to account for that
+      # Applicable maths:
+      #  https://www.desmos.com/calculator
+      #  https://www.calculator.net/slope-calculator.html
+      #  (steering wheel angle / steering ratio) = tire angle ..
+      # So, if the calculation below is determining the tire angle, look for values under about 1.5 degrees
+      self.angle_Check = angle_steers - angle_offset
+      # Seems like a change to k_f in latcontrol is somewhat permanent so pull it every time
+      self.pid.k_f = CP.steerKf
+      if abs(self.angle_Check) < self.vsrWindowLow :  # 0.3 degrees, for example
+        # Is the remaining wandering a result of static friction somewhere in the steering mechanism?
+        #  The smallest force required to start motion, or to overcome static friction, is always greater than the force required to continue the motion.
+        # So, let's try breaking it loose at low angles
+        # I think small corrections are being issued by OP but aren't forceful enough to break static friction in Prius
+        # Eventually, a larger correction is needed which is enough to move the steering wheel
+        # Increase kf for this steering correction
+        self.pid.k_f *= 7.0       # Kf is currently set to 0.00008 so if that changes, may need to set a number here statically
+        self.variableSteerRatio = self.lowSteerRatio                        # Use the lower ratio
+      elif self.vsrWindowLow < abs(self.angle_Check) < self.vsrWindowHigh:  # The VSR transition zone
+        # Begin the _variable_ part
+        # Find the slope of the line from the start of the VSR window to the end of the window - ( m = (y1 - y) / (x1 - x) )
+        self.vsrSlope = (self.lowSteerRatio - CP.steerRatio) / (self.vsrWindowLow - self.vsrWindowHigh)
+        # Solve for b (y-intercept) - (b = y - mx)
+        self.vsrYIntercept = (CP.steerRatio - self.vsrSlope) * self.vsrWindowHigh
+        # Use b to find y - (y = mx + b)
+        self.variableSteerRatio = (self.vsrSlope * self.angle_Check) + self.vsrYIntercept
+        # Increase kf here also to a lesser degree. Could use slope intercept here also maybe
+        self.pid.k_f *= 1.0        # May need to play with this value more at 70mph
+        if not self.lowSteerRatio <= self.variableSteerRatio <= CP.steerRatio:   # Sanity/safety check
+          if self.variableSteerRatio < self.lowSteerRatio:
+            self.variableSteerRatio = self.lowSteerRatio    # Reset to the low ratio
+          elif self.variableSteerRatio > CP.steerRatio:
+            self.variableSteerRatio = CP.steerRatio         # Reset to steerRatio from interface.py
+      else:                                                 # The angle is in the quick zone so do nothing
+        self.variableSteerRatio = CP.steerRatio             # Use steerRatio from interface.py
+
       # account for actuation delay
-      self.cur_state = calc_states_after_delay(self.cur_state, v_ego, angle_steers, curvature_factor, CP.steerRatio, CP.steerActuatorDelay)
+      self.cur_state = calc_states_after_delay(self.cur_state, v_ego, angle_steers, curvature_factor, self.variableSteerRatio, CP.steerActuatorDelay)
 
       v_ego_mpc = max(v_ego, 5.0)  # avoid mpc roughness due to low speed
       self.libmpc.run_mpc(self.cur_state, self.mpc_solution,
@@ -77,12 +123,11 @@ class LatControl(object):
       # reset to current steer angle if not active or overriding
       if active:
         delta_desired = self.mpc_solution[0].delta[1]
-      else:
-        delta_desired = math.radians(angle_steers - angle_offset) / CP.steerRatio
-
+      else:                   # Add a steering offset vs recalibrating steering sensor so it reads near 0
+        delta_desired = math.radians(self.angle_Check) / self.variableSteerRatio
       self.cur_state[0].delta = delta_desired
 
-      self.angle_steers_des_mpc = float(math.degrees(delta_desired * CP.steerRatio) + angle_offset)
+      self.angle_steers_des_mpc = float(math.degrees(delta_desired * self.variableSteerRatio) + angle_offset + self.manual_Steering_Offset)
       self.angle_steers_des_time = cur_time
       self.mpc_updated = True
 
@@ -91,7 +136,7 @@ class LatControl(object):
       t = sec_since_boot()
       if self.mpc_nans:
         self.libmpc.init(MPC_COST_LAT.PATH, MPC_COST_LAT.LANE, MPC_COST_LAT.HEADING, CP.steerRateCost)
-        self.cur_state[0].delta = math.radians(angle_steers) / CP.steerRatio
+        self.cur_state[0].delta = math.radians(angle_steers) / self.variableSteerRatio
 
         if t > self.last_cloudlog_t + 5.0:
           self.last_cloudlog_t = t
