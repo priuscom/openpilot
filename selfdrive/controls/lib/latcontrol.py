@@ -35,19 +35,18 @@ def apply_deadzone(angle, deadzone):
 class LatControl(object):
   def __init__(self, CP):
 
-    if CP.steerResistance > 0 and CP.steerReactance >= 0 and CP.steerInductance > 0
-      # Eliminate break-points, since they aren't needed (and would cause problems for resonance)
-      KpV = [np.interp(25.0, CP.steerKpBP, CP.steerKpV) * CP.steerReactance / CP.steerResistance]
-      KiV = [np.interp(25.0, CP.steerKiBP, CP.steerKiV) * CP.steerReactance / CP.steerResistance]
-      Kf = CP.steerKf * CP.steerInductance / CP.steerResistance
-      self.pid = PIController(([0.], KpV),
-                              ([0.], KiV),
-                              k_f=Kf, pos_limit=1.0)
+    if CP.steerResistance > 0 and CP.steerReactance >= 0 and CP.steerInductance > 0:
       self.smooth_factor = CP.steerInductance * 2.0 * CP.steerActuatorDelay / _DT    # Multiplier for inductive component (feed forward)
       self.projection_factor = CP.steerReactance * CP.steerActuatorDelay / 2.0       # Mutiplier for reactive component (PI)
-      self.accel_limit = 5.0 / CP.steerResistance                                    # Desired acceleration limit to prevent "whip steer" (resistive component)
-      self.ff_angle_factor = 0.5                                                     # Kf multiplier for angle-based feed forward
-      self.ff_rate_factor = 5.0                                                      # Kf multiplier for rate-based feed forward
+      self.accel_limit = 2.0 / CP.steerResistance                                    # Desired acceleration limit to prevent "whip steer" (resistive component)
+      self.ff_angle_factor = 1.0                                                     # Kf multiplier for angle-based feed forward
+      self.ff_rate_factor = 10.0                                                      # Kf multiplier for rate-based feed forward
+      # Eliminate break-points, since they aren't needed (and would cause problems for resonance)
+      KpV = [np.interp(25.0, CP.steerKpBP, CP.steerKpV)]
+      KiV = [np.interp(25.0, CP.steerKiBP, CP.steerKiV) * _DT / self.projection_factor]
+      self.pid = PIController(([0.], KpV),
+                              ([0.], KiV),
+                              k_f=CP.steerKf, pos_limit=1.0)
     else:
       self.pid = PIController((CP.steerKpBP, CP.steerKpV),
                               (CP.steerKiBP, CP.steerKiV),
@@ -213,6 +212,6 @@ class LatControl(object):
 
     # return MPC angle in the unused output (for ALCA)
     if CP.steerControlType == car.CarParams.SteerControlType.torque:
-      return output_steer, self.angle_steers_des_mpc
+      return output_steer, self.angle_steers_des
     else:
       return self.angle_steers_des_mpc, float(self.angle_steers_des)
