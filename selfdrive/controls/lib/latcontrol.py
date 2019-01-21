@@ -35,27 +35,36 @@ def apply_deadzone(angle, deadzone):
 class LatControl(object):
   def __init__(self, CP):
 
-    # Eliminate break-points, since they aren't needed (and would cause problems for resonance)
-    KpV = [np.interp(25.0, CP.steerKpBP, CP.steerKpV) * CP.steerReactance]
-    KiV = [np.interp(25.0, CP.steerKiBP, CP.steerKiV) * CP.steerReactance]
-    Kf = CP.steerKf * CP.steerInductance
-    self.pid = PIController(([0.], KpV),
-                            ([0.], KiV),
-                            k_f=Kf, pos_limit=1.0)
+    if CP.steerResistance > 0 and CP.steerReactance >= 0 and CP.steerInductance > 0
+      # Eliminate break-points, since they aren't needed (and would cause problems for resonance)
+      KpV = [np.interp(25.0, CP.steerKpBP, CP.steerKpV) * CP.steerReactance / CP.steerResistance]
+      KiV = [np.interp(25.0, CP.steerKiBP, CP.steerKiV) * CP.steerReactance / CP.steerResistance]
+      Kf = CP.steerKf * CP.steerInductance / CP.steerResistance
+      self.pid = PIController(([0.], KpV),
+                              ([0.], KiV),
+                              k_f=Kf, pos_limit=1.0)
+      self.smooth_factor = CP.steerInductance * 2.0 * CP.steerActuatorDelay / _DT    # Multiplier for inductive component (feed forward)
+      self.projection_factor = CP.steerReactance * CP.steerActuatorDelay / 2.0       # Mutiplier for reactive component (PI)
+      self.accel_limit = 5.0 / CP.steerResistance                                    # Desired acceleration limit to prevent "whip steer" (resistive component)
+      self.ff_angle_factor = 0.5                                                     # Kf multiplier for angle-based feed forward
+      self.ff_rate_factor = 5.0                                                      # Kf multiplier for rate-based feed forward
+    else:
+      self.pid = PIController((CP.steerKpBP, CP.steerKpV),
+                              (CP.steerKiBP, CP.steerKiV),
+                              k_f=CP.steerKf, pos_limit=1.0)
+      self.smooth_factor = 1.0
+      self.projection_factor = 0.0
+      self.accel_limit = 0.0
+      self.ff_angle_factor = 1.0
+      self.ff_rate_factor = 0.0
     self.last_cloudlog_t = 0.0
     self.setup_mpc(CP.steerRateCost)
-    self.smooth_factor = CP.steerInductance * 2.0 * CP.steerActuatorDelay / _DT    # Multiplier for inductive component (feed forward)
-    self.projection_factor = CP.steerReactance * 5.0 * _DT                         # Mutiplier for reactive component (PI)
-    self.accel_limit = 2.0 / CP.steerResistance                                    # Desired acceleration limit to prevent "whip steer" (resistive component)
-    self.ff_angle_factor = 0.5                                                     # Kf multiplier for angle-based feed forward
-    self.ff_rate_factor = 5.0                                                      # Kf multiplier for rate-based feed forward
     self.prev_angle_rate = 0
     self.feed_forward = 0.0
     self.last_mpc_ts = 0.0
     self.angle_steers_des = 0.0
     self.angle_steers_des_time = 0.0
     self.angle_steers_des_mpc = 0.0
-    self.projected_angle_steers = 0.0
     self.steer_counter = 1.0
     self.steer_counter_prev = 0.0
     self.rough_steers_rate = 0.0
@@ -174,7 +183,7 @@ class LatControl(object):
       projected_angle_steers_des = self.angle_steers_des + self.projection_factor * restricted_steer_rate
 
       # Determine future angle steers using accellerated steer rate
-      self.projected_angle_steers = float(angle_steers) + self.projection_factor * float(accelerated_angle_rate)
+      projected_angle_steers = float(angle_steers) + self.projection_factor * float(accelerated_angle_rate)
 
       steers_max = get_steer_max(CP, v_ego)
       self.pid.pos_limit = steers_max
@@ -195,7 +204,7 @@ class LatControl(object):
           self.feed_forward = (((self.smooth_factor - 1.) * self.feed_forward) + 0.0) / self.smooth_factor
 
         # Use projected desired and actual angles instead of "current" values, in order to make PI more reactive (for resonance)
-        output_steer = self.pid.update(projected_angle_steers_des, self.projected_angle_steers, check_saturation=(v_ego > 10),
+        output_steer = self.pid.update(projected_angle_steers_des, projected_angle_steers, check_saturation=(v_ego > 10),
                                         override=steer_override, feedforward=self.feed_forward, speed=v_ego, deadzone=deadzone)
 
     self.sat_flag = self.pid.saturated
@@ -204,6 +213,6 @@ class LatControl(object):
 
     # return MPC angle in the unused output (for ALCA)
     if CP.steerControlType == car.CarParams.SteerControlType.torque:
-      return output_steer, self.mpc_angles[1]
+      return output_steer, self.angle_steers_des_mpc
     else:
-      return self.mpc_angles[1], float(self.angle_steers_des)
+      return self.angle_steers_des_mpc, float(self.angle_steers_des)
