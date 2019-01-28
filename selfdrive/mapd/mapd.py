@@ -28,7 +28,7 @@ from common.params import Params
 from common.transformations.coordinates import geodetic2ecef
 from selfdrive.services import service_list
 import selfdrive.messaging as messaging
-from mapd_helpers import MAPS_LOOKAHEAD_DISTANCE, Way, circle_through_points
+from mapd_helpers import LOOKAHEAD_TIME, MAPS_LOOKAHEAD_DISTANCE, Way, circle_through_points
 import selfdrive.crash as crash
 from selfdrive.version import version, dirty
 
@@ -42,7 +42,6 @@ last_gps = None
 query_lock = threading.Lock()
 last_query_result = None
 last_query_pos = None
-cache_valid = False
 
 
 def setup_thread_excepthook():
@@ -82,7 +81,7 @@ def build_way_query(lat, lon, radius=50):
 
 
 def query_thread():
-  global last_query_result, last_query_pos, cache_valid
+  global last_query_result, last_query_pos
   api = overpy.Overpass(url=OVERPASS_API_URL, headers=OVERPASS_HEADERS, timeout=10.)
 
   while True:
@@ -99,10 +98,7 @@ def query_thread():
         if dist < 1000:
           continue
 
-        if dist > 3000:
-          cache_valid = False
-
-      q = build_way_query(last_gps.latitude, last_gps.longitude, radius=3000)
+      q = build_way_query(last_gps.latitude, last_gps.longitude, radius=2000)
       try:
         new_result = api.query(q)
 
@@ -126,7 +122,6 @@ def query_thread():
         query_lock.acquire()
         last_query_result = new_result, tree, real_nodes, node_to_way
         last_query_pos = last_gps
-        cache_valid = True
         query_lock.release()
 
       except Exception as e:
@@ -151,6 +146,8 @@ def mapsd_thread():
   dist_to_turn = 0.
   road_points = None
 
+  xx = np.arange(0, MAPS_LOOKAHEAD_DISTANCE, 10)
+
   while True:
     gps = messaging.recv_one(gps_sock)
     gps_ext = messaging.recv_one_or_none(gps_external_sock)
@@ -163,16 +160,14 @@ def mapsd_thread():
     last_gps = gps
 
     fix_ok = gps.flags & 1
-    if not fix_ok or last_query_result is None or not cache_valid:
+    if not fix_ok or last_query_result is None:
       cur_way = None
       curvature = None
       curvature_valid = False
       upcoming_curvature = 0.
       dist_to_turn = 0.
       road_points = None
-      map_valid = False
     else:
-      map_valid = True
       lat = gps.latitude
       lon = gps.longitude
       heading = gps.bearing
@@ -189,11 +184,9 @@ def mapsd_thread():
 
         if speed < 10:
           curvature_valid = False
-        if curvature_valid and pnts.shape[0] <= 3:
-          curvature_valid = False
 
         # The curvature is valid when at least MAPS_LOOKAHEAD_DISTANCE of road is found
-        if curvature_valid:
+        if curvature_valid and pnts.shape[0] > 3:
           # Compute the curvature for each point
           with np.errstate(divide='ignore'):
             circles = [circle_through_points(*p) for p in zip(pnts, pnts[1:], pnts[2:])]
@@ -213,31 +206,22 @@ def mapsd_thread():
             dists.append(dists[-1] + np.linalg.norm(p - p_prev))
           dists = np.asarray(dists)
           dists = dists - dists[closest] + dist_to_closest
-          dists = dists[1:-1]
 
-          close_idx = np.logical_and(dists > 0, dists < 500)
-          dists = dists[close_idx]
-          curvature = curvature[close_idx]
+          # TODO: Determine left or right turn
+          curvature = np.nan_to_num(curvature)
+          curvature_interp = np.interp(xx, dists[1:-1], curvature)
+          curvature_lookahead = curvature_interp[:int(speed * LOOKAHEAD_TIME / 10)]
 
-          if len(curvature):
-            # TODO: Determine left or right turn
-            curvature = np.nan_to_num(curvature)
+          # Outlier rejection
+          new_curvature = np.percentile(curvature_lookahead, 90)
 
-            # Outlier rejection
-            new_curvature = np.percentile(curvature, 90, interpolation='lower')
-
-            k = 0.6
-            upcoming_curvature = k * upcoming_curvature + (1 - k) * new_curvature
-            in_turn_indices = curvature > 0.8 * new_curvature
-
-            if np.any(in_turn_indices):
-              dist_to_turn = np.min(dists[in_turn_indices])
-            else:
-              dist_to_turn = 999
+          k = 0.9
+          upcoming_curvature = k * upcoming_curvature + (1 - k) * new_curvature
+          in_turn_indices = curvature_interp > 0.8 * new_curvature
+          if np.any(in_turn_indices):
+            dist_to_turn = np.min(xx[in_turn_indices])
           else:
-            upcoming_curvature = 0.
             dist_to_turn = 999
-
       query_lock.release()
 
     dat = messaging.new_message()
@@ -262,10 +246,8 @@ def mapsd_thread():
       if road_points is not None:
         dat.liveMapData.roadX, dat.liveMapData.roadY = road_points
       if curvature is not None:
-        dat.liveMapData.roadCurvatureX = map(float, dists)
-        dat.liveMapData.roadCurvature = map(float, curvature)
-
-    dat.liveMapData.mapValid = map_valid
+        dat.liveMapData.roadCurvatureX = map(float, xx)
+        dat.liveMapData.roadCurvature = map(float, curvature_interp)
 
     map_data_sock.send(dat.to_bytes())
 
