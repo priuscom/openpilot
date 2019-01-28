@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 
-# This file is not used by OpenPilot. Only boardd.cc is used.
-# The python version is slower, but has more options for development.
-
 # TODO: merge the extra functionalities of this file (like MOCK) in boardd.c and
 # delete this python version of boardd
 
@@ -26,7 +23,6 @@ except Exception:
 SAFETY_NOOUTPUT = 0
 SAFETY_HONDA = 1
 SAFETY_TOYOTA = 2
-SAFETY_CHRYSLER = 9
 SAFETY_TOYOTA_NOLIMITS = 0x1336
 SAFETY_ALLOUTPUT = 0x1337
 
@@ -167,9 +163,6 @@ def boardd_loop(rate=200):
   # *** subscribes to can send
   sendcan = messaging.sub_sock(context, service_list['sendcan'].port)
 
-  # drain sendcan to delete any stale messages from previous runs
-  messaging.drain_sock(sendcan)
-
   while 1:
     # health packet @ 1hz
     if (rk.frame%rate) == 0:
@@ -181,7 +174,6 @@ def boardd_loop(rate=200):
       msg.health.voltage = health['voltage']
       msg.health.current = health['current']
       msg.health.started = health['started']
-      msg.health.controlsAllowed = True
 
       health_sock.send(msg.to_bytes())
 
@@ -212,9 +204,6 @@ def boardd_proxy_loop(rate=200, address="192.168.2.251"):
   logcan = messaging.sub_sock(context, service_list['can'].port, addr=address)
   # *** publishes to can send
   sendcan = messaging.pub_sock(context, service_list['sendcan'].port)
-
-  # drain sendcan to delete any stale messages from previous runs
-  messaging.drain_sock(sendcan)
 
   while 1:
     # recv @ 100hz

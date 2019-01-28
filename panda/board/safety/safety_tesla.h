@@ -258,7 +258,7 @@ static int tesla_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd)
     // remove EPB_epasControl
     if (addr == 0x214)
     {
-      return -1;
+      return false;
     }
 
     return 2; // Custom EPAS bus
@@ -269,12 +269,12 @@ static int tesla_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd)
     // remove GTW_epasControl in forwards
     if (addr == 0x101)
     {
-      return -1;
+      return false;
     }
 
     return 0; // Chassis CAN
   }
-  return -1;
+  return false;
 }
 
 const safety_hooks tesla_hooks = {

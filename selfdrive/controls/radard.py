@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import gc
 import zmq
 import numpy as np
 import numpy.matlib
@@ -43,10 +44,9 @@ class EKFV1D(EKF):
     return tf, tfj
 
 
-## fuses camera and radar data for best lead detection
-# FIXME: radard has a memory leak of about 50MB/hr
-# BOUNTY: $100 coupon on shop.comma.ai
+# fuses camera and radar data for best lead detection
 def radard_thread(gctx=None):
+  gc.disable()
   set_realtime_priority(2)
 
   # wait for stats about the car to come in from controls
