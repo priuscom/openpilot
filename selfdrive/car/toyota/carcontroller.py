@@ -1,3 +1,4 @@
+from cereal import car
 from common.numpy_fast import clip, interp
 from selfdrive.boardd.boardd import can_list_to_can_capnp
 from selfdrive.car.toyota.toyotacan import make_can_msg, create_video_target,\
@@ -6,6 +7,9 @@ from selfdrive.car.toyota.toyotacan import make_can_msg, create_video_target,\
                                            create_fcw_command
 from selfdrive.car.toyota.values import ECU, STATIC_MSGS
 from selfdrive.can.packer import CANPacker
+
+VisualAlert = car.CarControl.HUDControl.VisualAlert
+AudibleAlert = car.CarControl.HUDControl.AudibleAlert
 
 # Accel limits
 ACCEL_HYST_GAP = 0.02  # don't change accel command for small oscilalitons within this value
@@ -54,14 +58,14 @@ def process_hud_alert(hud_alert, audible_alert):
   sound1 = 0
   sound2 = 0
 
-  if hud_alert == 'fcw':
+  if hud_alert == VisualAlert.fcw:
     fcw = 1
-  elif hud_alert == 'steerRequired':
+  elif hud_alert == VisualAlert.steerRequired:
     steer = 1
 
-  if audible_alert == 'chimeRepeated':
+  if audible_alert == AudibleAlert.chimeWarningRepeat:
     sound1 = 1
-  elif audible_alert in ['beepSingle', 'chimeSingle', 'chimeDouble']:
+  elif audible_alert != AudibleAlert.none:
     # TODO: find a way to send single chimes
     sound2 = 1
 
@@ -108,6 +112,7 @@ class CarController(object):
 
     self.steer_angle_enabled = False
     self.ipas_reset_counter = 0
+    self.last_fault_frame = -200
 
     self.fake_ecus = set()
     if enable_camera: self.fake_ecus.add(ECU.CAM)
@@ -117,7 +122,7 @@ class CarController(object):
     self.packer = CANPacker(dbc_name)
 
   def update(self, sendcan, enabled, CS, frame, actuators,
-             pcm_cancel_cmd, hud_alert, audible_alert):
+             pcm_cancel_cmd, hud_alert, audible_alert, forwarding_camera):
 
     # *** compute control surfaces ***
 
@@ -143,8 +148,15 @@ class CarController(object):
     # dropping torque immediately might cause eps to temp fault. On the other hand, safety_toyota
     # cuts steer torque immediately anyway TODO: monitor if this is a real issue
     # only cut torque when steer state is a known fault
-    if not enabled or CS.steer_state in [9, 25]:
+    if CS.steer_state in [9, 25]:
+      self.last_fault_frame = frame
+
+    # Cut steering for 2s after fault
+    if not enabled or (frame - self.last_fault_frame < 200):
       apply_steer = 0
+      apply_steer_req = 0
+    else:
+      apply_steer_req = 1
 
     self.steer_angle_enabled, self.ipas_reset_counter = \
       ipas_state_transition(self.steer_angle_enabled, enabled, CS.ipas_active, self.ipas_reset_counter)
@@ -192,12 +204,12 @@ class CarController(object):
     # on consecutive messages
     if ECU.CAM in self.fake_ecus:
       if self.angle_control:
-        can_sends.append(create_steer_command(self.packer, 0., frame))
+        can_sends.append(create_steer_command(self.packer, 0., 0, frame))
       else:
-        can_sends.append(create_steer_command(self.packer, apply_steer, frame))
+        can_sends.append(create_steer_command(self.packer, apply_steer, apply_steer_req, frame))
 
     if self.angle_control:
-      can_sends.append(create_ipas_steer_command(self.packer, apply_angle, self.steer_angle_enabled, 
+      can_sends.append(create_ipas_steer_command(self.packer, apply_angle, self.steer_angle_enabled,
                                                  ECU.APGS in self.fake_ecus))
     elif ECU.APGS in self.fake_ecus:
       can_sends.append(create_ipas_steer_command(self.packer, 0, 0, True))
@@ -209,7 +221,7 @@ class CarController(object):
       else:
         can_sends.append(create_accel_command(self.packer, 0, pcm_cancel_cmd, False))
 
-    if frame % 10 == 0 and ECU.CAM in self.fake_ecus:
+    if frame % 10 == 0 and ECU.CAM in self.fake_ecus and not forwarding_camera:
       for addr in TARGET_IDS:
         can_sends.append(create_video_target(frame/10, addr))
 
@@ -228,12 +240,14 @@ class CarController(object):
 
     if (frame % 100 == 0 or send_ui) and ECU.CAM in self.fake_ecus:
       can_sends.append(create_ui_command(self.packer, steer, sound1, sound2))
+
+    if frame % 100 == 0 and ECU.DSU in self.fake_ecus:
       can_sends.append(create_fcw_command(self.packer, fcw))
 
     #*** static msgs ***
 
     for (addr, ecu, cars, bus, fr_step, vl) in STATIC_MSGS:
-      if frame % fr_step == 0 and ecu in self.fake_ecus and self.car_fingerprint in cars:
+      if frame % fr_step == 0 and ecu in self.fake_ecus and self.car_fingerprint in cars and not (ecu == ECU.CAM and forwarding_camera):
         # special cases
         if fr_step == 5 and ecu == ECU.CAM and bus == 1:
           cnt = (((frame / 5) % 7) + 1) << 5
