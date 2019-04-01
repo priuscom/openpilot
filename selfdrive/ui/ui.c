@@ -268,7 +268,7 @@ static void set_brightness(UIState *s, int brightness) {
 static void set_awake(UIState *s, bool awake) {
   if (awake) {
     // 30 second timeout at 30 fps
-    s->awake_timeout = 30*30;
+    s->awake_timeout = 15*60;
   }
   if (s->awake != awake) {
     s->awake = awake;
@@ -1599,7 +1599,7 @@ static void ui_update(UIState *s) {
         polls[3].revents || polls[4].revents || polls[6].revents ||
         polls[7].revents || polls[8].revents) {
       // awake on any (old) activity
-      set_awake(s, true);
+      //set_awake(s, true);
     }
 
     if (s->vision_connected && polls[9].revents) {

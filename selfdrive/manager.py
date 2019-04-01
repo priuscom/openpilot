@@ -89,6 +89,7 @@ managed_processes = {
   "thermald": "selfdrive.thermald",
   "uploader": "selfdrive.loggerd.uploader",
   "controlsd": "selfdrive.controls.controlsd",
+  "plannerd": "selfdrive.controls.plannerd",
   "radard": "selfdrive.controls.radard",
   "ubloxd": "selfdrive.locationd.ubloxd",
   "mapd": "selfdrive.mapd.mapd",
@@ -101,11 +102,12 @@ managed_processes = {
   "pandad": "selfdrive.pandad",
   "ui": ("selfdrive/ui", ["./start.sh"]),
   "calibrationd": "selfdrive.locationd.calibrationd",
+  "locationd": "selfdrive.locationd.locationd_local",
   "visiond": ("selfdrive/visiond", ["./visiond"]),
   "sensord": ("selfdrive/sensord", ["./sensord"]),
   "gpsd": ("selfdrive/sensord", ["./gpsd"]),
-  "orbd": ("selfdrive/orbd", ["./orbd_wrapper.sh"]),
   "updated": "selfdrive.updated",
+  "athena": "selfdrive.athena.athenad",
 }
 android_packages = ("ai.comma.plus.offroad", "ai.comma.plus.frame")
 
@@ -128,18 +130,20 @@ persistent_processes = [
   'ui',
   'gpsd',
   'updated',
+  'athena'
 ]
 
 car_started_processes = [
   'controlsd',
+  'plannerd',
   'loggerd',
   'sensord',
   'radard',
   'calibrationd',
+  'locationd',
   'visiond',
   'proclogd',
   'ubloxd',
-  'orbd',
   'mapd',
 ]
 
@@ -452,6 +456,7 @@ def main():
     del managed_processes['proclogd']
   if os.getenv("NOCONTROL") is not None:
     del managed_processes['controlsd']
+    del managed_processes['plannerd']
     del managed_processes['radard']
 
   # support additional internal only extensions
