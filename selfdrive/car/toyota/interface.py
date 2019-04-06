@@ -149,6 +149,15 @@ class CarInterface(object):
       ret.mass = 4590 * CV.LB_TO_KG + std_cargo #mean between normal (4505) and limited (4750)
       ret.steerKpV, ret.steerKiV = [[0.18], [0.0075]]
       ret.steerKf = 0.0003
+      
+     elif candidate == CAR.AURIS:
+      ret.safetyParam = 100 # see conversion factor for STEER_TORQUE_EPS in dbc file
+      ret.wheelbase = 2.70
+      ret.steerRatio = 17.8
+      tire_stiffness_factor = 0.444
+      ret.mass = 2860 * CV.LB_TO_KG + std_cargo  # mean between normal and hybrid
+      ret.steerKpV, ret.steerKiV = [[0.2], [0.05]]
+      ret.steerKf = 0.00003   # full torque for 20 deg at 80mph means 0.00007818594
 
 
     ret.steerRateCost = 1.
