@@ -11,10 +11,6 @@ def main(gctx=None):
   while True:
     # try network
     ping_failed = subprocess.call(["ping", "-W", "4", "-c", "1", "8.8.8.8"])
-
-    # Disable openpilot software auto-updater
-    ping_failed = 0
-
     if ping_failed:
       time.sleep(60)
       continue
