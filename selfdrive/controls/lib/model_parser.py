@@ -13,9 +13,9 @@ class ModelParser(object):
     self.lead_dist, self.lead_prob, self.lead_var = 0, 0, 1
     self._path_pinv = compute_path_pinv()
 
-    self.lane_width_estimate = 3.7
+    self.lane_width_estimate = 2.75
     self.lane_width_certainty = 1.0
-    self.lane_width = 3.7
+    self.lane_width = 2.75
     self.l_prob = 0.
     self.r_prob = 0.
 
