@@ -87,13 +87,13 @@ class CarInterface(object):
       ret.mass = 3375 * CV.LB_TO_KG + std_cargo
 
       ret.lateralTuning.init('indi')
-      ret.lateralTuning.indi.innerLoopGain = 5.5
-      ret.lateralTuning.indi.outerLoopGain = 1.3
-      ret.lateralTuning.indi.timeConstant = 1.0
-      ret.lateralTuning.indi.actuatorEffectiveness = 1.0
+      ret.lateralTuning.indi.innerLoopGain = 4.75
+      ret.lateralTuning.indi.outerLoopGain = 2.0
+      ret.lateralTuning.indi.timeConstant = 3.0
+      ret.lateralTuning.indi.actuatorEffectiveness = 1.5
 
-      ret.steerActuatorDelay = 0.12
-      ret.steerRateCost = 0.6
+      ret.steerActuatorDelay = 0.5
+      ret.steerRateCost = 0.5
 
     elif candidate in [CAR.RAV4, CAR.RAV4H]:
       stop_and_go = True if (candidate in CAR.RAV4H) else False
