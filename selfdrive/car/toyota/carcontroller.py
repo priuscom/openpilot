@@ -67,10 +67,10 @@ def process_hud_alert(hud_alert, audible_alert):
     steer = 1
 
   if audible_alert == AudibleAlert.chimeWarningRepeat:
-    sound1 = 1
+    sound1 = 1  # This is the longer beep, although 0 seems to disable all sounds somehow
   elif audible_alert != AudibleAlert.none:
     # TODO: find a way to send single chimes
-    sound2 = 1
+    sound2 = 0  # This should be the double-beep, but 0 disables only the multiple beep
 
   return steer, fcw, sound1, sound2
 
