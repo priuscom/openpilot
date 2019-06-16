@@ -5,13 +5,11 @@ struct sample_t {
   int max;
 } sample_t_default = {{0}, 0, 0};
 
-// no float support in STM32F2 micros (cortex-m3)
-#ifdef PANDA
+// safety code requires floats
 struct lookup_t {
   float x[3];
   float y[3];
 };
-#endif
 
 void safety_rx_hook(CAN_FIFOMailBox_TypeDef *to_push);
 int safety_tx_hook(CAN_FIFOMailBox_TypeDef *to_send);
@@ -27,9 +25,7 @@ int driver_limit_check(int val, int val_last, struct sample_t *val_driver,
   const int MAX, const int MAX_RATE_UP, const int MAX_RATE_DOWN,
   const int MAX_ALLOWANCE, const int DRIVER_FACTOR);
 int rt_rate_limit_check(int val, int val_last, const int MAX_RT_DELTA);
-#ifdef PANDA
 float interpolate(struct lookup_t xy, float x);
-#endif
 
 typedef void (*safety_hook_init)(int16_t param);
 typedef void (*rx_hook)(CAN_FIFOMailBox_TypeDef *to_push);
@@ -49,16 +45,19 @@ typedef struct {
 
 // This can be set by the safety hooks.
 int controls_allowed = 0;
+int gas_interceptor_detected = 0;
+int gas_interceptor_prev = 0;
+
+// This is set by USB command 0xdf
+int long_controls_allowed = 1;
 
 // Include the actual safety policies.
 #include "safety/safety_defaults.h"
 #include "safety/safety_honda.h"
 #include "safety/safety_toyota.h"
-#ifdef PANDA
 #include "safety/safety_toyota_ipas.h"
 #include "safety/safety_tesla.h"
 #include "safety/safety_gm_ascm.h"
-#endif
 #include "safety/safety_gm.h"
 #include "safety/safety_ford.h"
 #include "safety/safety_cadillac.h"
@@ -109,7 +108,6 @@ typedef struct {
 #define SAFETY_SUBARU 10
 #define SAFETY_GM_ASCM 0x1334
 #define SAFETY_TOYOTA_IPAS 0x1335
-#define SAFETY_TOYOTA_NOLIMITS 0x1336
 #define SAFETY_ALLOUTPUT 0x1337
 #define SAFETY_ELM327 0xE327
 
@@ -124,12 +122,9 @@ const safety_hook_config safety_hook_registry[] = {
   {SAFETY_HYUNDAI, &hyundai_hooks},
   {SAFETY_CHRYSLER, &chrysler_hooks},
   {SAFETY_SUBARU, &subaru_hooks},
-  {SAFETY_TOYOTA_NOLIMITS, &toyota_nolimits_hooks},
-#ifdef PANDA
   {SAFETY_TOYOTA_IPAS, &toyota_ipas_hooks},
   {SAFETY_GM_ASCM, &gm_ascm_hooks},
   {SAFETY_TESLA, &tesla_hooks},
-#endif
   {SAFETY_ALLOUTPUT, &alloutput_hooks},
   {SAFETY_ELM327, &elm327_hooks},
 };
@@ -229,7 +224,6 @@ int rt_rate_limit_check(int val, int val_last, const int MAX_RT_DELTA) {
 }
 
 
-#ifdef PANDA
 // interp function that holds extreme values
 float interpolate(struct lookup_t xy, float x) {
   int size = sizeof(xy.x) / sizeof(xy.x[0]);
@@ -254,4 +248,3 @@ float interpolate(struct lookup_t xy, float x) {
     return xy.y[size - 1];
   }
 }
-#endif

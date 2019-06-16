@@ -42,7 +42,7 @@ def unblock_stdout():
 
 if __name__ == "__main__":
   neos_update_required = os.path.isfile("/init.qcom.rc") \
-    and (not os.path.isfile("/VERSION") or int(open("/VERSION").read()) < 8)
+    and (not os.path.isfile("/VERSION") or int(open("/VERSION").read()) < 9)
   if neos_update_required:
     # update continue.sh before updating NEOS
     if os.path.isfile(os.path.join(BASEDIR, "scripts", "continue.sh")):
@@ -88,11 +88,11 @@ from selfdrive.loggerd.config import ROOT
 managed_processes = {
   "thermald": "selfdrive.thermald",
   "uploader": "selfdrive.loggerd.uploader",
+  "deleter": "selfdrive.loggerd.deleter",
   "controlsd": "selfdrive.controls.controlsd",
   "plannerd": "selfdrive.controls.plannerd",
   "radard": "selfdrive.controls.radard",
-  "ubloxd": "selfdrive.locationd.ubloxd",
-  "mapd": "selfdrive.mapd.mapd",
+  "ubloxd": ("selfdrive/locationd", ["./ubloxd"]),
   "loggerd": ("selfdrive/loggerd", ["./loggerd"]),
   "logmessaged": "selfdrive.logmessaged",
   "tombstoned": "selfdrive.tombstoned",
@@ -100,7 +100,7 @@ managed_processes = {
   "proclogd": ("selfdrive/proclogd", ["./proclogd"]),
   "boardd": ("selfdrive/boardd", ["./boardd"]),   # not used directly
   "pandad": "selfdrive.pandad",
-  "ui": ("selfdrive/ui", ["./start.sh"]),
+  "ui": ("selfdrive/ui", ["./start.py"]),
   "calibrationd": "selfdrive.locationd.calibrationd",
   "locationd": "selfdrive.locationd.locationd_local",
   "visiond": ("selfdrive/visiond", ["./visiond"]),
@@ -128,9 +128,8 @@ persistent_processes = [
   'tombstoned',
   'uploader',
   'ui',
-  'gpsd',
   'updated',
-  'athena'
+  'athena',
 ]
 
 car_started_processes = [
@@ -144,7 +143,8 @@ car_started_processes = [
   'visiond',
   'proclogd',
   'ubloxd',
-  'mapd',
+  'gpsd',
+  'deleter',
 ]
 
 def register_managed_process(name, desc, car_started=False):
@@ -316,6 +316,7 @@ def manager_thread():
   # save boot log
   subprocess.call(["./loggerd", "--bootlog"], cwd=os.path.join(BASEDIR, "selfdrive/loggerd"))
 
+  # start persistent processes
   for p in persistent_processes:
     start_managed_process(p)
 
@@ -354,8 +355,8 @@ def manager_thread():
         kill_managed_process(p)
 
     # check the status of all processes, did any of them die?
-    for p in running:
-      cloudlog.debug("   running %s %s" % (p, running[p]))
+    running_list = ["   running %s %s" % (p, running[p]) for p in running]
+    cloudlog.debug('\n'.join(running_list))
 
     # is this still needed?
     if params.get("DoUninstall") == "1":
@@ -391,7 +392,7 @@ def update_apks():
 
   cloudlog.info("installed apks %s" % (str(installed), ))
 
-  for app in installed.iterkeys():
+  for app in installed.keys():
 
     apk_path = os.path.join(BASEDIR, "apk/"+app+".apk")
     if not os.path.exists(apk_path):
@@ -462,7 +463,7 @@ def main():
   # support additional internal only extensions
   try:
     import selfdrive.manager_extensions
-    selfdrive.manager_extensions.register(register_managed_process)
+    selfdrive.manager_extensions.register(register_managed_process) # pylint: disable=no-member
   except ImportError:
     pass
 

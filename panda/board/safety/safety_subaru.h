@@ -14,6 +14,8 @@ int subaru_desired_torque_last = 0;
 uint32_t subaru_ts_last = 0;
 struct sample_t subaru_torque_driver;         // last few driver torques measured
 
+static void subaru_init(int16_t param) {
+}
 
 static void subaru_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
   int bus_number = (to_push->RDTR >> 4) & 0xFF;
@@ -100,6 +102,7 @@ static int subaru_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
 
   // forward CAN 0 > 1
   if (bus_num == 0) {
+
     return 2; // ES CAN
   }
   // forward CAN 1 > 0, except ES_LKAS
@@ -113,6 +116,14 @@ static int subaru_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
     if (addr == 0x122) {
       return -1;
     }
+    // ES Distance
+    if (addr == 545) {
+      return -1;
+    }
+    // ES LKAS
+    if (addr == 802) {
+      return -1;
+    }
 
     return 0; // Main CAN
   }
@@ -122,7 +133,7 @@ static int subaru_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
 }
 
 const safety_hooks subaru_hooks = {
-  .init = nooutput_init,
+  .init = subaru_init,
   .rx = subaru_rx_hook,
   .tx = subaru_tx_hook,
   .tx_lin = nooutput_tx_lin_hook,
