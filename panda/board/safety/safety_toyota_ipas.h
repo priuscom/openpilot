@@ -153,4 +153,3 @@ const safety_hooks toyota_ipas_hooks = {
   .ignition = default_ign_hook,
   .fwd = toyota_fwd_hook,
 };
-

@@ -219,12 +219,6 @@ static int tesla_tx_hook(CAN_FIFOMailBox_TypeDef *to_send)
   return true;
 }
 
-static int tesla_tx_lin_hook(int lin_num, uint8_t *data, int len)
-{
-  // LIN is not used on the Tesla
-  return false;
-}
-
 static void tesla_init(int16_t param)
 {
   controls_allowed = 0;
@@ -278,10 +272,10 @@ static int tesla_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd)
 }
 
 const safety_hooks tesla_hooks = {
-    .init = tesla_init,
-    .rx = tesla_rx_hook,
-    .tx = tesla_tx_hook,
-    .tx_lin = tesla_tx_lin_hook,
-    .ignition = tesla_ign_hook,
-    .fwd = tesla_fwd_hook,
+  .init = tesla_init,
+  .rx = tesla_rx_hook,
+  .tx = tesla_tx_hook,
+  .tx_lin = nooutput_tx_lin_hook,
+  .ignition = tesla_ign_hook,
+  .fwd = tesla_fwd_hook,
 };

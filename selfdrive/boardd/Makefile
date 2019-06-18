@@ -46,6 +46,7 @@ all: boardd
 include ../common/cereal.mk
 
 OBJS = boardd.o \
+       can_list_to_can_capnp.o \
        ../common/swaglog.o \
        ../common/params.o \
        ../common/util.o \
@@ -63,7 +64,7 @@ boardd: $(OBJS)
 
 boardd.o: boardd.cc
 	@echo "[ CXX ] $@"
-	$(CXX) $(CXXFLAGS) \
+	$(CXX) $(CXXFLAGS) -MMD \
            -I$(PHONELIBS)/android_system_core/include \
            $(CEREAL_CFLAGS) \
            $(CEREAL_CXXFLAGS) \
@@ -71,6 +72,15 @@ boardd.o: boardd.cc
            -I../ \
            -I../../ \
            -c -o '$@' '$<'
+
+
+boardd_api_impl.so: libcan_list_to_can_capnp.a boardd_api_impl.pyx boardd_setup.py
+	python boardd_setup.py build_ext --inplace
+	rm -rf build
+	rm -f boardd_api_impl.cpp
+
+libcan_list_to_can_capnp.a: can_list_to_can_capnp.o $(CEREAL_OBJS)
+	ar rcsD '$@' $^
 
 %.o: %.c
 	@echo "[ CC ] $@"
@@ -81,8 +91,16 @@ boardd.o: boardd.cc
           $(JSON_FLAGS) \
           -c -o '$@' '$<'
 
+%.o: %.cc
+	@echo "[ CC ] $@"
+	$(CXX) $(CXXFLAGS) -MMD \
+          -Iinclude -I.. -I../.. \
+          $(CEREAL_CXXFLAGS) \
+          $(ZMQ_FLAGS) \
+          -c -o '$@' '$<'
+
 .PHONY: clean
 clean:
-	rm -f boardd $(OBJS) $(DEPS)
+	rm -f boardd libcan_list_to_can_capnp.a boardd_api_impl.so $(OBJS) $(DEPS)
 
 -include $(DEPS)

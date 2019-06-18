@@ -7,14 +7,17 @@ from cereal import car
 from common.realtime import sec_since_boot
 from selfdrive.services import service_list
 import selfdrive.messaging as messaging
-from selfdrive.car.toyota.values import NO_DSU_CAR
+from selfdrive.car.toyota.values import NO_DSU_CAR, DBC, TSSP2_CAR
 
+def _create_radar_can_parser(car_fingerprint):
+  dbc_f = DBC[car_fingerprint]['radar']
 
-RADAR_A_MSGS = list(range(0x210, 0x220))
-RADAR_B_MSGS = list(range(0x220, 0x230))
-
-def _create_radard_can_parser():
-  dbc_f = 'toyota_prius_2017_adas.dbc'
+  if car_fingerprint in TSSP2_CAR:
+    RADAR_A_MSGS = list(range(0x180, 0x190))
+    RADAR_B_MSGS = list(range(0x190, 0x1a0))
+  else:
+    RADAR_A_MSGS = list(range(0x210, 0x220))
+    RADAR_B_MSGS = list(range(0x220, 0x230))
 
   msg_a_n = len(RADAR_A_MSGS)
   msg_b_n = len(RADAR_B_MSGS)
@@ -28,17 +31,24 @@ def _create_radard_can_parser():
 
   return CANParser(os.path.splitext(dbc_f)[0], signals, checks, 1)
 
-
 class RadarInterface(object):
   def __init__(self, CP):
     # radar
     self.pts = {}
-    self.valid_cnt = {key: 0 for key in RADAR_A_MSGS}
     self.track_id = 0
 
     self.delay = 0.0  # Delay of radar
 
-    self.rcp = _create_radard_can_parser()
+    if CP.carFingerprint in TSSP2_CAR:
+      self.RADAR_A_MSGS = list(range(0x180, 0x190))
+      self.RADAR_B_MSGS = list(range(0x190, 0x1a0))
+    else:
+      self.RADAR_A_MSGS = list(range(0x210, 0x220))
+      self.RADAR_B_MSGS = list(range(0x220, 0x230))
+
+    self.valid_cnt = {key: 0 for key in self.RADAR_A_MSGS}
+
+    self.rcp = _create_radar_can_parser(CP.carFingerprint)
     self.no_dsu_car = CP.carFingerprint in NO_DSU_CAR
 
     context = zmq.Context()
@@ -46,7 +56,8 @@ class RadarInterface(object):
 
   def update(self):
 
-    ret = car.RadarState.new_message()
+    ret = car.RadarData.new_message()
+
     if self.no_dsu_car:
       # TODO: make a adas dbc file for dsu-less models
       time.sleep(0.05)
@@ -56,8 +67,9 @@ class RadarInterface(object):
     updated_messages = set()
     while 1:
       tm = int(sec_since_boot() * 1e9)
-      updated_messages.update(self.rcp.update(tm, True))
-      if RADAR_B_MSGS[-1] in updated_messages:
+      _, vls = self.rcp.update(tm, True)
+      updated_messages.update(vls)
+      if self.RADAR_B_MSGS[-1] in updated_messages:
         break
 
     errors = []
@@ -67,7 +79,7 @@ class RadarInterface(object):
     ret.canMonoTimes = canMonoTimes
 
     for ii in updated_messages:
-      if ii in RADAR_A_MSGS:
+      if ii in self.RADAR_A_MSGS:
         cpt = self.rcp.vl[ii]
 
         if cpt['LONG_DIST'] >=255 or cpt['NEW_TRACK']:
@@ -83,7 +95,7 @@ class RadarInterface(object):
         # radar point only valid if it's a valid measurement and score is above 50
         if cpt['VALID'] or (score > 50 and cpt['LONG_DIST'] < 255 and self.valid_cnt[ii] > 0):
           if ii not in self.pts or cpt['NEW_TRACK']:
-            self.pts[ii] = car.RadarState.RadarPoint.new_message()
+            self.pts[ii] = car.RadarData.RadarPoint.new_message()
             self.pts[ii].trackId = self.track_id
             self.track_id += 1
           self.pts[ii].dRel = cpt['LONG_DIST']  # from front of car
