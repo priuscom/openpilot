@@ -1519,7 +1519,7 @@ static void ui_update(UIState *s) {
         polls[3].revents || polls[4].revents || polls[6].revents ||
         polls[7].revents || polls[8].revents) {
       // awake on any (old) activity
-      set_awake(s, true);
+     // set_awake(s, true);
     }
 
     if (s->vision_connected && polls[9].revents) {
