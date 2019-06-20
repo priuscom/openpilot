@@ -31,6 +31,12 @@ def apply_deadzone(angle_steers, angle_steers_des, deadzone):
 class PathPlanner(object):
   def __init__(self, CP):
     self.MP = ModelParser()
+    kegman = kegman_conf(CP)
+    self.frame = 0
+    self.lane_cost = MPC_COST_LAT.LANE
+    self.heading_cost = MPC_COST_LAT.HEADING
+    self.path_cost = MPC_COST_LAT.PATH
+    self.rate_cost = CP.steerRateCost
 
     self.last_cloudlog_t = 0
 
@@ -39,15 +45,31 @@ class PathPlanner(object):
     self.livempc = messaging.pub_sock(context, service_list['liveMpc'].port)
     self.liveStreamData = messaging.pub_sock(context, 8600)
 
-    self.setup_mpc(CP.steerRateCost)
+    self.setup_mpc(CP.steerRateCost, self.path_cost, self.lane_cost, self.heading_cost)
     self.invalid_counter = 0
     self.mpc_angles = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     self.mpc_rates = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     self.mpc_times = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
-  def setup_mpc(self, steer_rate_cost):
+  def live_tune(self, CP):
+    self.frame += 1
+    if self.frame % 300 == 0:
+      # live tuning through /data/openpilot/tune.py overrides interface.py settings
+      kegman = kegman_conf()
+      lane_cost = float(kegman.conf['laneCost'])
+      path_cost = float(kegman.conf['pathCost'])
+      rate_cost = float(kegman.conf['rateCost'])
+      heading_cost = float(kegman.conf['headCost'])
+      if lane_cost != self.lane_cost or path_cost != self.path_cost or heading_cost != self.heading_cost or rate_cost != self.rate_cost:
+        self.lane_cost = lane_cost
+        self.path_cost = path_cost
+        self.heading_cost = heading_cost
+        self.rate_cost = rate_cost
+        self.setup_mpc(rate_cost, path_cost, lane_cost, heading_cost)
+
+   def setup_mpc(self, steer_rate_cost, path_cost, lane_cost, heading_cost):
     self.libmpc = libmpc_py.libmpc
-    self.libmpc.init(MPC_COST_LAT.PATH, MPC_COST_LAT.LANE, MPC_COST_LAT.HEADING, steer_rate_cost)
+    self.libmpc.init(path_cost, lane_cost, heading_cost, steer_rate_cost)
 
     self.mpc_solution = libmpc_py.ffi.new("log_t *")
     self.cur_state = libmpc_py.ffi.new("state_t *")

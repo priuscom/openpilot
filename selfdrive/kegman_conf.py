@@ -58,6 +58,12 @@ class kegman_conf():
     if self.conf['centerFactor'] == "-1":
       self.conf['centerFactor'] = str(round(CP.centerFactor, 3))
       write_conf = True
+    if self.conf['rateCost'] == "-1":
+      self.conf['rateCost'] = str(round(CP.steerRateCost,3))
+      self.conf['laneCost'] = "3.0"
+      self.conf['headCost'] = "1.0"
+      self.conf['pathCost'] = "1.0"
+      write_conf = True
 
     if write_conf:
       self.write_config(self.config)
@@ -125,6 +131,11 @@ class kegman_conf():
         self.config.update({"scalePoly":"-1"})
         self.element_updated = True
 
+      if "rateCost" not in self.config:
+        self.config.update({"pathCost":"-1"})
+        self.config.update({"laneCost":"-1"})
+        self.config.update({"rateCost":"-1"})
+        self.config.update({"headCost":"-1"})
 
       # Force update battery charge limits to higher values for Big Model
       #if self.config['battChargeMin'] != "75":
@@ -141,7 +152,7 @@ class kegman_conf():
                      "wheelTouchSeconds":"180", "battPercOff":"25", "carVoltageMinEonShutdown":"11800", \
                      "brakeStoppingTarget":"0.25", "tuneGernby":"1", "reactMPC":"-1", "reactSteer":"-1","reactRate":"-1", \
                      "dampMPC":"-1", "dampSteer":"-1", "dampRate":"-1", "Kp":"-1", "Ki":"-1", "centerFactor":"-1", "reactPoly":"-1", "dampPoly":"-1", "scalePoly":"-1", "rateFF":"-1", "delaySteer":"-1", \
-                     "oscFactor":"-1", "backlash":"-1", "longOffset":"-1"}
+                     "oscFactor":"-1", "backlash":"-1", "longOffset":"-1", "rateCost":"-1", "headCost":"-1", "pathCost":"-1", "laneCost":"-1"}
 
       self.write_config(self.config)
     return self.config
