@@ -179,7 +179,7 @@ class CarInterface(object):
     ret.rateFFGain = 0.4
     ret.oscillationFactor = 0.0
     ret.steerBacklash = 1.0
-    ret.longOffset = 0.0 
+    ret.longOffset = 0.0
     ret.steerMPCDampTime = 0.175
     ret.steerMPCReactTime = -0.02
     ret.rateDampTime = 0.1
@@ -481,7 +481,7 @@ class CarInterface(object):
     ret.startAccel = 0.5
 
     ret.steerActuatorDelay = 0.1
-    ret.steerRateCost = 0.2
+    ret.steerRateCost = 0.5
 
     return ret
 

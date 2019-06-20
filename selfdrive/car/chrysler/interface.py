@@ -83,7 +83,7 @@ class CarInterface(object):
     ret.steerKpV, ret.steerKiV =   [[0.15,0.30], [0.03,0.05]]
     ret.steerKf = 0.00006   # full torque for 10 deg at 80mph means 0.00007818594
     ret.steerActuatorDelay = 0.1
-    ret.steerRateCost = 0.7
+    ret.steerRateCost = 0.5
     ret.steerMPCReactTime = 0.025     # increase total MPC projected time by 25 ms
     ret.steerMPCDampTime = 0.15       # dampen desired angle over 250ms (5 mpc cycles)
     ret.rateFFGain = 0.01

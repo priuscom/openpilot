@@ -66,7 +66,7 @@ class CarInterface(object):
     ret.rateFFGain = 0.01
 
     std_cargo = 136
-    ret.steerRateCost = 0.7
+    ret.steerRateCost = 0.5
     ret.carCANRate = 100.0
 
     if candidate in [CAR.IMPREZA]:

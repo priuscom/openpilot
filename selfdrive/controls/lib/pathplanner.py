@@ -2,7 +2,7 @@ import zmq
 import math
 import json
 import numpy as np
-
+from selfdrive.kegman_conf import kegman_conf
 from common.realtime import sec_since_boot
 from selfdrive.services import service_list
 from selfdrive.swaglog import cloudlog
@@ -67,9 +67,11 @@ class PathPlanner(object):
         self.rate_cost = rate_cost
         self.setup_mpc(rate_cost, path_cost, lane_cost, heading_cost)
 
-   def setup_mpc(self, steer_rate_cost, path_cost, lane_cost, heading_cost):
+
+  def setup_mpc(self, steer_rate_cost, path_cost, lane_cost, heading_cost):
     self.libmpc = libmpc_py.libmpc
     self.libmpc.init(path_cost, lane_cost, heading_cost, steer_rate_cost)
+    print(steer_rate_cost, path_cost, lane_cost, heading_cost)
 
     self.mpc_solution = libmpc_py.ffi.new("log_t *")
     self.cur_state = libmpc_py.ffi.new("state_t *")
@@ -84,6 +86,7 @@ class PathPlanner(object):
     self.angle_steers_des_time = 0.0
 
   def update(self, CP, VM, CS, md, live100, live_parameters, live_map_data):
+    self.live_tune(CP)
     v_ego = CS.carState.vEgo
     angle_steers = live100.live100.angleSteers
     angle_rate = live100.live100.angleRate

@@ -44,7 +44,7 @@ button_delay = 0.2
 kegman = kegman_conf()
 #kegman.conf['tuneGernby'] = "1"
 #kegman.write_config(kegman.conf)
-param = ["tuneGernby", "reactMPC", "dampMPC", "reactSteer", "dampSteer", "dampRate", "rateFF", "Kp", "Ki", "centerFactor", "reactPoly", "dampPoly", "scalePoly", "delaySteer", "longOffset", "oscFactor", "backlash"]
+param = ["tuneGernby", "reactMPC", "dampMPC", "reactSteer", "dampSteer", "dampRate", "rateFF", "Kp", "Ki", "centerFactor", "reactPoly", "dampPoly", "scalePoly", "delaySteer", "longOffset", "oscFactor", "backlash", "headCost", "rateCost", "pathCost", "laneCost"]
 
 try:
   devnull = open(os.devnull, 'w')
@@ -147,13 +147,13 @@ while True:
     kegman.conf[param[j]] = "1"
     write_json = True
 
-  elif (char == " "):
+  elif (char == " " or char == "."):
     if j < len(param) - 1:
       j = j + 1
     else:
       j = 0
 
-  elif (char == "m"):
+  elif (char == "m" or char == ","):
     if j > 0:
       j = j - 1
     else:
@@ -214,6 +214,18 @@ while True:
 
   if float(kegman.conf['delaySteer']) < 0:
     kegman.conf['delaySteer'] = "0.001"
+
+  if float(kegman.conf['rateCost']) <= 0:
+    kegman.conf['rateCost'] = "0.001"
+
+  if float(kegman.conf['headCost']) <= 0:
+    kegman.conf['headCost'] = "0.001"
+
+  if float(kegman.conf['pathCost']) <= 0:
+    kegman.conf['pathCost'] = "0.001"
+
+  if float(kegman.conf['laneCost']) <= 0:
+    kegman.conf['laneCost'] = "0.001"
 
   if float(kegman.conf['reactSteer']) + float(kegman.conf['dampSteer']) < 0:
     if param[j] == 'reactSteer':
