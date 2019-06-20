@@ -79,9 +79,9 @@ class CarInterface(object):
     tireStiffnessFront_civic = 192150
     tireStiffnessRear_civic = 202500
     ret.steerMPCReactTime = -0.05
-    ret.steerMPCDampTime = 0.175
+    ret.steerMPCDampTime = 0.075
     ret.rateFFGain = 0.4
-    ret.steerActuatorDelay = 0.12
+    ret.steerActuatorDelay = 0.1
     ret.steerBacklash = 2.0
     ret.steerKiBP, ret.steerKpBP = [[0.], [0.]]
     ret.carCANRate = 82.87750704
@@ -91,10 +91,10 @@ class CarInterface(object):
     ret.rateDampTime = 0.1
     ret.rateReactTime = -0.07
     ret.oscillationFactor = 0.0
-    ret.centerFactor = 0.002
+    ret.centerFactor = 0.001
     ret.polyDampTime = 0.2
     ret.polyReactTime = 1.0
-    ret.polyScale = 0.1
+    ret.polyScale = [[0.0, 0.5, 1.0, 2.0, 5.0], [1.0, 0.5, 0.25, 0.1, 0.0], [1.0, 1.0, 1.0, 1.0, 1.0]]  # [abs rate, scale UP, scale DOWN]
 
     if candidate == CAR.PRIUS:
       stop_and_go = True
@@ -107,15 +107,15 @@ class CarInterface(object):
       ret.steerKf = 0.0001   # full torque for 10 deg at 80mph means 0.00007818594
       # TODO: Prius seem to have very laggy actuators. Understand if it is lag or hysteresis
       ret.steerPscale = [[1.0, 2.0, 10.0], [1.0, 0.5, 0.25], [1.0, 0.75, 0.5]]  # [abs angles, scale UP, scale DOWN]
-      ret.steerActuatorDelay = 0.0
+      ret.steerActuatorDelay = 0.1
       ret.steerDampTime = 0.0
       ret.steerReactTime = 0.01
       ret.rateDampTime = 0.15
       ret.rateReactTime = -0.14
-      ret.steerMPCReactTime = -0.12     # increase total MPC projected time by 25 ms
-      ret.steerMPCDampTime = 0.18       # dampen desired angle over 250ms (5 mpc cycles)
-      ret.rateFFGain = 0.2
-      ret.longOffset = 0.4
+      ret.steerMPCReactTime = -0.05     # increase total MPC projected time by 25 ms
+      ret.steerMPCDampTime = 0.075       # dampen desired angle over 250ms (5 mpc cycles)
+      ret.rateFFGain = 0.4
+      ret.longOffset = 0.0
 
     elif candidate in [CAR.RAV4, CAR.RAV4H]:
       stop_and_go = True if (candidate in CAR.RAV4H) else False
@@ -124,18 +124,18 @@ class CarInterface(object):
       ret.steerRatio = 16.3   # 14.5 is spec end-to-end
       tire_stiffness_factor = 0.5533
       ret.mass = 3650 * CV.LB_TO_KG + std_cargo  # mean between normal and hybrid
-      ret.steerKpV, ret.steerKiV = [[0.4], [0.02]] # [[0.6], [0.05]]
-      ret.steerKf = 0.0001   # full torque for 10 deg at 80mph means 0.00007818594
-      ret.steerDampTime = 0.1
+      ret.steerKpV, ret.steerKiV = [[0.4], [0.05]] # [[0.6], [0.05]]
+      ret.steerKf = 0.00007   # full torque for 10 deg at 80mph means 0.00007818594
+      ret.steerDampTime = 0.05
       ret.steerReactTime = 0.0
       ret.steerPscale = [[1.0, 2.0, 10.0], [1.0, 0.5, 0.25], [1.0, 0.75, 0.5]]  # [abs angles, scale UP, scale DOWN]
       ret.rateDampTime = 0.1
       ret.rateReactTime = 0.02
-      ret.steerMPCReactTime = -0.075     # increase total MPC projected time by 25 ms
-      ret.steerMPCDampTime = 0.175       # dampen desired angle over 250ms (5 mpc cycles)
+      ret.steerMPCReactTime = -0.05     # increase total MPC projected time by 25 ms
+      ret.steerMPCDampTime = 0.075       # dampen desired angle over 250ms (5 mpc cycles)
       ret.rateFFGain = 0.4
-      ret.steerActuatorDelay = 0.02
-      ret.longOffset = 0.4
+      ret.steerActuatorDelay = 0.1
+      ret.longOffset = 0.0
       ret.oscillationFactor = 0.0
 
     elif candidate == CAR.COROLLA:
