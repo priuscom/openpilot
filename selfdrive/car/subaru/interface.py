@@ -61,9 +61,9 @@ class CarInterface(object):
     ret.steerLimitAlert = True
 
     ret.enableCamera = True
-    ret.steerMPCReactTime = 0.025     # increase total MPC projected time by 25 ms
-    ret.steerMPCDampTime = 0.15       # dampen desired angle over 250ms (5 mpc cycles)
-    ret.rateFFGain = 0.01
+    ret.steerMPCReactTime = 0.0     # increase total MPC projected time by 25 ms
+    ret.steerMPCDampTime = 0.25       # dampen desired angle over 250ms (5 mpc cycles)
+    ret.rateFFGain = 0.4
 
     std_cargo = 136
     ret.steerRateCost = 0.5
@@ -75,7 +75,7 @@ class CarInterface(object):
       ret.centerToFront = ret.wheelbase * 0.5
       ret.steerRatio = 15
       tire_stiffness_factor = 1.0
-      ret.steerActuatorDelay = 0.4   # end-to-end angle controller
+      ret.steerActuatorDelay = 0.1   # end-to-end angle controller
       ret.steerKf = 0.00005
       ret.steerKiBP, ret.steerKpBP = [[0., 20.], [0., 20.]]
       ret.steerKpV, ret.steerKiV = [[0.2, 0.3], [0.02, 0.03]]

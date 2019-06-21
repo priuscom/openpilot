@@ -95,6 +95,7 @@ class CarInterface(object):
     ret.polyDampTime = 0.2
     ret.polyReactTime = 1.0
     ret.polyScale = [[0.0, 0.5, 1.0, 2.0, 5.0], [1.0, 0.5, 0.25, 0.1, 0.0], [1.0, 1.0, 1.0, 1.0, 1.0]]  # [abs rate, scale UP, scale DOWN]
+    ret.steerPscale = [[1.0, 2.0, 10.0], [1.0, 0.5, 0.25], [1.0, 0.75, 0.5]]  # [abs angles, scale UP, scale DOWN]
 
     if candidate == CAR.PRIUS:
       stop_and_go = True
@@ -106,7 +107,6 @@ class CarInterface(object):
       ret.steerKpV, ret.steerKiV = [[0.4], [0.05]]
       ret.steerKf = 0.00007   # full torque for 10 deg at 80mph means 0.00007818594
       # TODO: Prius seem to have very laggy actuators. Understand if it is lag or hysteresis
-      ret.steerPscale = [[1.0, 2.0, 10.0], [1.0, 0.5, 0.25], [1.0, 0.75, 0.5]]  # [abs angles, scale UP, scale DOWN]
 
     elif candidate in [CAR.RAV4, CAR.RAV4H]:
       stop_and_go = True if (candidate in CAR.RAV4H) else False
@@ -117,10 +117,6 @@ class CarInterface(object):
       ret.mass = 3650 * CV.LB_TO_KG + std_cargo  # mean between normal and hybrid
       ret.steerKpV, ret.steerKiV = [[0.4], [0.05]] # [[0.6], [0.05]]
       ret.steerKf = 0.00007   # full torque for 10 deg at 80mph means 0.00007818594
-      ret.steerDampTime = 0.1
-      ret.steerReactTime = 0.0
-      ret.steerPscale = [[1.0, 2.0, 10.0], [1.0, 0.5, 0.25], [1.0, 0.75, 0.5]]  # [abs angles, scale UP, scale DOWN]
-      ret.rateDampTime = 0.1
 
     elif candidate == CAR.COROLLA:
       stop_and_go = False

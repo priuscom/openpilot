@@ -68,12 +68,12 @@ class CarInterface(object):
     ret.steerKiBP, ret.steerKpBP = [[0.], [0.]]
     ret.steerKpV, ret.steerKiV = [[0.2], [0.025]]
     ret.steerKf = 0.00004   # full torque for 20 deg at 80mph means 0.00007818594
-    ret.steerMPCReactTime = 0.025
-    ret.steerMPCDampTime = 0.175
-    ret.steerReactTime = 0.001
-    ret.steerDampTime = 0.001
-    ret.rateFFGain = 0.2
-    ret.eonToFront = 0.1
+    ret.steerMPCReactTime = 0.0
+    ret.steerMPCDampTime = 0.25
+    ret.steerReactTime = 0.0
+    ret.steerDampTime = 0.1
+    ret.rateFFGain = 0.4
+    ret.eonToFront = 0.0
     # Presence of a camera on the object bus is ok.
     # Have to go passive if ASCM is online (ACC-enabled cars),
     # or camera is on powertrain bus (LKA cars without ACC).

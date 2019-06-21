@@ -178,12 +178,12 @@ class CarInterface(object):
     ret.carCANRate = 100.0
     ret.rateFFGain = 0.4
     ret.oscillationFactor = 0.0
-    ret.steerBacklash = 1.0
+    ret.steerBacklash = 0.0
     ret.longOffset = 0.0
-    ret.steerMPCDampTime = 0.175
-    ret.steerMPCReactTime = -0.02
+    ret.steerMPCDampTime = 0.25
+    ret.steerMPCReactTime = 0.0
     ret.rateDampTime = 0.1
-    ret.rateReactTime = 0.02
+    ret.rateReactTime = 0.0
     ret.steerDampTime = 0.1
     ret.steerReactTime = 0.0
     ret.centerFactor = 0.008
@@ -220,16 +220,6 @@ class CarInterface(object):
       ret.longitudinalKpV = [3.6, 2.4, 1.5]
       ret.longitudinalKiBP = [0., 35.]
       ret.longitudinalKiV = [0.54, 0.36]
-      ret.rateFFGain = 0.4
-      ret.oscillationFactor = 0.0
-      ret.steerBacklash = 0.0
-      ret.longOffset = 0.0
-      ret.steerMPCDampTime = 0.175
-      ret.steerMPCReactTime = -0.02
-      ret.rateDampTime = 0.1
-      ret.rateReactTime = 0.02
-      ret.steerDampTime = 0.1
-      ret.steerReactTime = 0.0
 
     elif candidate in (CAR.ACCORD, CAR.ACCORD_15, CAR.ACCORDH):
       stop_and_go = True
@@ -245,17 +235,6 @@ class CarInterface(object):
       ret.longitudinalKpV = [1.2, 0.8, 0.5]
       ret.longitudinalKiBP = [0., 35.]
       ret.longitudinalKiV = [0.18, 0.12]
-      ret.rateFFGain = 0.4
-      ret.oscillationFactor = 0.0
-      ret.steerBacklash = 0.0
-      ret.longOffset = 0.0
-      ret.steerMPCDampTime = 0.175
-      ret.steerMPCReactTime = -0.02
-      ret.rateDampTime = 0.1
-      ret.rateReactTime = 0.02
-      ret.steerDampTime = 0.1
-      ret.steerReactTime = 0.0
-
 
     elif candidate == CAR.ACURA_ILX:
       stop_and_go = False
@@ -269,16 +248,6 @@ class CarInterface(object):
       ret.longitudinalKpV = [1.2, 0.8, 0.5]
       ret.longitudinalKiBP = [0., 35.]
       ret.longitudinalKiV = [0.18, 0.12]
-      ret.rateFFGain = 0.4
-      ret.oscillationFactor = 0.0
-      ret.steerBacklash = 0.0
-      ret.longOffset = 0.0
-      ret.steerMPCDampTime = 0.175
-      ret.steerMPCReactTime = -0.02
-      ret.rateDampTime = 0.1
-      ret.rateReactTime = 0.02
-      ret.steerDampTime = 0.1
-      ret.steerReactTime = 0.0
 
     elif candidate == CAR.CRV:
       stop_and_go = False
@@ -292,16 +261,6 @@ class CarInterface(object):
       ret.longitudinalKpV = [1.2, 0.8, 0.5]
       ret.longitudinalKiBP = [0., 35.]
       ret.longitudinalKiV = [0.18, 0.12]
-      ret.rateFFGain = 0.4
-      ret.oscillationFactor = 0.0
-      ret.steerBacklash = 0.0
-      ret.longOffset = 0.0
-      ret.steerMPCDampTime = 0.175
-      ret.steerMPCReactTime = -0.02
-      ret.rateDampTime = 0.1
-      ret.rateReactTime = 0.02
-      ret.steerDampTime = 0.1
-      ret.steerReactTime = 0.0
 
     elif candidate == CAR.CRV_5G:
       stop_and_go = True
@@ -316,16 +275,6 @@ class CarInterface(object):
       ret.longitudinalKpV = [1.2, 0.8, 0.5]
       ret.longitudinalKiBP = [0., 35.]
       ret.longitudinalKiV = [0.18, 0.12]
-      ret.rateFFGain = 0.4
-      ret.oscillationFactor = 0.0
-      ret.steerBacklash = 0.0
-      ret.longOffset = 0.0
-      ret.steerMPCDampTime = 0.175
-      ret.steerMPCReactTime = -0.02
-      ret.rateDampTime = 0.1
-      ret.rateReactTime = 0.02
-      ret.steerDampTime = 0.1
-      ret.steerReactTime = 0.0
 
     elif candidate == CAR.CRV_HYBRID:
       stop_and_go = True
@@ -340,16 +289,6 @@ class CarInterface(object):
       ret.longitudinalKpV = [1.2, 0.8, 0.5]
       ret.longitudinalKiBP = [0., 35.]
       ret.longitudinalKiV = [0.18, 0.12]
-      ret.rateFFGain = 0.4
-      ret.oscillationFactor = 0.0
-      ret.steerBacklash = 0.0
-      ret.longOffset = 0.0
-      ret.steerMPCDampTime = 0.175
-      ret.steerMPCReactTime = -0.02
-      ret.rateDampTime = 0.1
-      ret.rateReactTime = 0.02
-      ret.steerDampTime = 0.1
-      ret.steerReactTime = 0.0
 
     elif candidate == CAR.ACURA_RDX:
       stop_and_go = False
@@ -402,16 +341,6 @@ class CarInterface(object):
       ret.longitudinalKpV = [1.2, 0.8, 0.5]
       ret.longitudinalKiBP = [0., 35.]
       ret.longitudinalKiV = [0.18, 0.12]
-      ret.rateFFGain = 0.4
-      ret.oscillationFactor = 0.0
-      ret.steerBacklash = 0.0
-      ret.longOffset = 0.0
-      ret.steerMPCDampTime = 0.175
-      ret.steerMPCReactTime = -0.02
-      ret.rateDampTime = 0.1
-      ret.rateReactTime = 0.02
-      ret.steerDampTime = 0.1
-      ret.steerReactTime = 0.0
 
     elif candidate == CAR.RIDGELINE:
       stop_and_go = False
@@ -425,16 +354,6 @@ class CarInterface(object):
       ret.longitudinalKpV = [1.2, 0.8, 0.5]
       ret.longitudinalKiBP = [0., 35.]
       ret.longitudinalKiV = [0.18, 0.12]
-      ret.rateFFGain = 0.4
-      ret.oscillationFactor = 0.0
-      ret.steerBacklash = 0.0
-      ret.longOffset = 0.0
-      ret.steerMPCDampTime = 0.175
-      ret.steerMPCReactTime = -0.02
-      ret.rateDampTime = 0.1
-      ret.rateReactTime = 0.02
-      ret.steerDampTime = 0.1
-      ret.steerReactTime = 0.0
 
     else:
       raise ValueError("unsupported car %s" % candidate)

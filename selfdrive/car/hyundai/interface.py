@@ -74,9 +74,9 @@ class CarInterface(object):
     rotationalInertia_civic = 2500
     tireStiffnessFront_civic = 192150
     tireStiffnessRear_civic = 202500
-    ret.steerMPCReactTime = 0.025     # increase total MPC projected time by 25 ms
-    ret.steerMPCDampTime = 0.15       # dampen desired angle over 250ms (5 mpc cycles)
-    ret.rateFFGain = 0.01
+    ret.steerMPCReactTime = 0.0     # increase total MPC projected time by 25 ms
+    ret.steerMPCDampTime = 0.25       # dampen desired angle over 250ms (5 mpc cycles)
+    ret.rateFFGain = 0.4
     tire_stiffness_factor = 1.
     ret.carCANRate = 100.0
 
