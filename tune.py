@@ -239,6 +239,12 @@ while True:
     else:
       kegman.conf['dampMPC'] = str(-1 * float(kegman.conf['reactMPC']))
 
+  if float(kegman.conf['reactMPC']) + float(kegman.conf['dampMPC']) > 0.25:
+    if param[j] == 'reactMPC':
+      kegman.conf['dampMPC'] = str(0.25 - float(kegman.conf['reactMPC']))
+    else:
+      kegman.conf['reactMPC'] = str(0.25 - float(kegman.conf['dampMPC']))
+
   if write_json:
     kegman.write_config(kegman.conf)
 
