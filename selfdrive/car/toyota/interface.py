@@ -78,7 +78,7 @@ class CarInterface(object):
     rotationalInertia_civic = 2500
     tireStiffnessFront_civic = 192150
     tireStiffnessRear_civic = 202500
-    ret.steerMPCReactTime = 0.0
+    ret.steerMPCReactTime = -0.05
     ret.steerMPCDampTime = 0.25
     ret.rateFFGain = 0.4
     ret.steerActuatorDelay = 0.1
@@ -91,7 +91,7 @@ class CarInterface(object):
     ret.rateDampTime = 0.1
     ret.rateReactTime = 0.0
     ret.oscillationFactor = 0.0
-    ret.centerFactor = 0.001
+    ret.centerFactor = 0.0015
     ret.polyDampTime = 0.2
     ret.polyReactTime = 1.0
     ret.polyScale = [[0.0, 0.5, 1.0, 2.0, 5.0], [1.0, 0.5, 0.25, 0.1, 0.0], [1.0, 1.0, 1.0, 1.0, 1.0]]  # [abs rate, scale UP, scale DOWN]
@@ -169,6 +169,8 @@ class CarInterface(object):
       ret.steerKf = 0.00006
 
     ret.steerRateCost = 0.5
+    ret.steerHeadingCost = 2.0
+
     ret.centerToFront = ret.wheelbase * 0.44
 
     ret.longPidDeadzoneBP = [0., 9.]

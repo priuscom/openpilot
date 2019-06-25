@@ -374,6 +374,9 @@ struct CarParams {
   stoppingControl @34 :Bool; # Does the car allows full control even at lows speeds when stopping
   startAccel @35 :Float32; # Required acceleraton to overcome creep braking
   steerRateCost @40 :Float32; # Lateral MPC cost on steering rate
+  steerHeadingCost @68 :Float32;
+  steerLaneCost @69 :Float32;
+  steerPathCost @70 :Float32;
   steerControlType @46 :SteerControlType;
   radarOffCan @47 :Bool; # True when radar objects aren't visible on CAN
 

@@ -106,7 +106,7 @@ class LatControl(object):
     self.pid.reset()
 
   def adjust_angle_gain(self, torque_clipped):
-    if (self.pid.f > 0) == (self.pid.i > 0) and abs(self.pid.i) >= abs(self.previous_integral):
+    if (self.pid.f > 0) == (self.pid.i > 0) and abs(self.pid.i) >= abs(self.previous_integral) and abs(self.pid.i) > 0:
       if not torque_clipped: self.angle_ff_gain *= 1.0001
     elif self.angle_ff_gain > 1.0:
       self.angle_ff_gain *= 0.9999

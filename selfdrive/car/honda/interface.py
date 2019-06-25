@@ -186,11 +186,11 @@ class CarInterface(object):
     ret.rateReactTime = 0.0
     ret.steerDampTime = 0.1
     ret.steerReactTime = 0.0
-    ret.centerFactor = 0.008
-    ret.polyDampTime = 0.05
+    ret.centerFactor = 0.003
+    ret.polyDampTime = 0.1
     ret.polyReactTime = 1.0
     ret.polyScale = [[0.0, 0.5, 1.0, 2.0, 5.0], [1.0, 0.5, 0.25, 0.1, 0.0], [1.0, 1.0, 1.0, 1.0, 1.0]]  # [abs rate, scale UP, scale DOWN]
-    ret.steerPscale = [[1.0, 2.0, 10.0], [1.0, 0.5, 0.25], [1.0, 1.0, 1.0]]  # [abs angles, scale UP, scale DOWN]
+    ret.steerPscale = [[1.0, 2.0, 10.0], [1.0, 0.5, 0.25], [1.0, 0.75, 0.5]]  # [abs angles, scale UP, scale DOWN]
 
     # Optimized car params: tire_stiffness_factor and steerRatio are a result of a vehicle
     # model optimization process. Certain Hondas have an extra steering sensor at the bottom
@@ -401,6 +401,7 @@ class CarInterface(object):
 
     ret.steerActuatorDelay = 0.1
     ret.steerRateCost = 0.5
+    ret.steerHeadingCost = 1.2
 
     return ret
 
