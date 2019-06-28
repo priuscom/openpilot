@@ -108,7 +108,7 @@ class PathPlanner(object):
     p_poly = libmpc_py.ffi.new("double[4]", list(self.MP.p_poly))
 
     # account for actuation delay
-    self.cur_state = calc_states_after_delay(self.cur_state, v_ego, angle_steers - angle_offset_average, curvature_factor, VM.sR, delaySteer, longOffset)
+    self.cur_state = calc_states_after_delay(self.cur_state, v_ego, angle_steers - angle_offset_bias, curvature_factor, VM.sR, delaySteer, longOffset)
 
     v_ego_mpc = max(v_ego, 5.0)  # avoid mpc roughness due to low speed
     self.libmpc.run_mpc(self.cur_state, self.mpc_solution,
@@ -117,7 +117,7 @@ class PathPlanner(object):
 
     # reset to current steer angle if not active or overriding
     #if active:
-    self.mpc_angles[0] = angle_steers + live100.live100.angleModelBias
+    self.mpc_angles[0] = angle_steers
     self.mpc_times[0] = live100.logMonoTime * 1e-9
     oversample_limit = 19 if v_ego == 0 else 4 + min(15, int(800.0 / v_ego))
     for i in range(1,20):
