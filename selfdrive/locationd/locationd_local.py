@@ -84,7 +84,7 @@ class Localizer(object):
       if sensor_reading.type == 4:
         self.sensor_counter += 1
         if self.sensor_counter % LEARNING_RATE == 0:
-          self.update_kalman(current_time, ObservationKind.PHONE_GYRO, [-sensor_reading.gyro.v[2], -sensor_reading.gyro.v[1], -sensor_reading.gyro.v[0]])
+          self.update_kalman(current_time, ObservationKind.PHONE_GYRO, [sensor_reading.gyro.v[2], sensor_reading.gyro.v[1], sensor_reading.gyro.v[0]])
 
   def handle_log(self, log):
     current_time = 1e-9 * log.logMonoTime
