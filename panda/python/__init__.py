@@ -8,6 +8,7 @@ import usb1
 import os
 import time
 import traceback
+import subprocess
 from dfu import PandaDFU
 from esptool import ESPROM, CesantaFlasher
 from flash_release import flash_release
@@ -15,7 +16,7 @@ from update import ensure_st_up_to_date
 from serial import PandaSerial
 from isotp import isotp_send, isotp_recv
 
-__version__ = '0.0.8'
+__version__ = '0.0.9'
 
 BASEDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../")
 
@@ -25,7 +26,13 @@ DEBUG = os.getenv("PANDADEBUG") is not None
 
 def build_st(target, mkfile="Makefile"):
   from panda import BASEDIR
-  assert(os.system('cd %s && make -f %s clean && make -f %s %s >/dev/null' % (os.path.join(BASEDIR, "board"), mkfile, mkfile, target)) == 0)
+  cmd = 'cd %s && make -f %s clean && make -f %s %s >/dev/null' % (os.path.join(BASEDIR, "board"), mkfile, mkfile, target)
+  try:
+    output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True)
+  except subprocess.CalledProcessError as exception:
+    output = exception.output
+    returncode = exception.returncode
+    raise
 
 def parse_can_buffer(dat):
   ret = []
@@ -175,6 +182,7 @@ class Panda(object):
           traceback.print_exc()
         if wait == False or self._handle != None:
           break
+        context = usb1.USBContext() #New context needed so new devices show up
     assert(self._handle != None)
     print("connected")
 
@@ -224,10 +232,10 @@ class Panda(object):
     print("flash: unlocking")
     handle.controlWrite(Panda.REQUEST_IN, 0xb1, 0, 0, b'')
 
-    # erase sectors 1 and 2
+    # erase sectors 1 through 3
     print("flash: erasing")
-    handle.controlWrite(Panda.REQUEST_IN, 0xb2, 1, 0, b'')
-    handle.controlWrite(Panda.REQUEST_IN, 0xb2, 2, 0, b'')
+    for i in range(1, 4):
+      handle.controlWrite(Panda.REQUEST_IN, 0xb2, i, 0, b'')
 
     # flash over EP2
     STEP = 0x10
@@ -243,6 +251,7 @@ class Panda(object):
       pass
 
   def flash(self, fn=None, code=None, reconnect=True):
+    print("flash: main version is " + self.get_version())
     if not self.bootstub:
       self.reset(enter_bootstub=True)
     assert(self.bootstub)
@@ -263,7 +272,7 @@ class Panda(object):
         code = f.read()
 
     # get version
-    print("flash: version is "+self.get_version())
+    print("flash: bootstub version is " + self.get_version())
 
     # do flash
     Panda.flash_static(self._handle, code)
@@ -272,11 +281,14 @@ class Panda(object):
     if reconnect:
       self.reconnect()
 
-  def recover(self):
+  def recover(self, timeout=None):
     self.reset(enter_bootloader=True)
+    t_start = time.time()
     while len(PandaDFU.list()) == 0:
       print("waiting for DFU...")
       time.sleep(0.1)
+      if timeout is not None and (time.time() - t_start) > timeout:
+        return False
 
     dfu = PandaDFU(PandaDFU.st_serial_to_dfu_serial(self._serial))
     dfu.recover()
@@ -284,6 +296,7 @@ class Panda(object):
     # reflash after recover
     self.connect(True, True)
     self.flash()
+    return True
 
   @staticmethod
   def flash_ota_st():
@@ -292,8 +305,9 @@ class Panda(object):
     return ret==0
 
   @staticmethod
-  def flash_ota_wifi():
-    ret = os.system("cd %s && make clean && make ota" % (os.path.join(BASEDIR, "boardesp")))
+  def flash_ota_wifi(release=False):
+    release_str = "RELEASE=1" if release else ""
+    ret = os.system("cd {} && make clean && {} make ota".format(os.path.join(BASEDIR, "boardesp"),release_str))
     time.sleep(1)
     return ret==0
 
@@ -320,13 +334,19 @@ class Panda(object):
   # ******************* health *******************
 
   def health(self):
-    dat = self._handle.controlRead(Panda.REQUEST_IN, 0xd2, 0, 0, 13)
-    a = struct.unpack("IIBBBBB", dat)
-    return {"voltage": a[0], "current": a[1],
-            "started": a[2], "controls_allowed": a[3],
-            "gas_interceptor_detected": a[4],
-            "started_signal_detected": a[5],
-            "started_alt": a[6]}
+    dat = self._handle.controlRead(Panda.REQUEST_IN, 0xd2, 0, 0, 24)
+    a = struct.unpack("IIIIIBBBB", dat)
+    return {
+      "voltage": a[0],
+      "current": a[1],
+      "can_send_errs": a[2],
+      "can_fwd_errs": a[3],
+      "gmlan_send_errs": a[4],
+      "started": a[5],
+      "controls_allowed": a[6],
+      "gas_interceptor_detected": a[7],
+      "car_harness_status": a[8]
+    }
 
   # ******************* control *******************
 
@@ -340,9 +360,14 @@ class Panda(object):
   def get_version(self):
     return self._handle.controlRead(Panda.REQUEST_IN, 0xd6, 0, 0, 0x40)
 
+  def get_type(self):
+    return self._handle.controlRead(Panda.REQUEST_IN, 0xc1, 0, 0, 0x40)
+
   def is_grey(self):
-    ret = self._handle.controlRead(Panda.REQUEST_IN, 0xc1, 0, 0, 0x40)
-    return ret == "\x01"
+    return self.get_type() == "\x02"
+
+  def is_black(self):
+    return self.get_type() == "\x03"
 
   def get_serial(self):
     dat = self._handle.controlRead(Panda.REQUEST_IN, 0xd0, 0, 0, 0x20)
@@ -373,14 +398,23 @@ class Panda(object):
     self._handle.controlWrite(Panda.REQUEST_OUT, 0xdd, from_bus, to_bus, b'')
 
   def set_gmlan(self, bus=2):
+    # TODO: check panda type
     if bus is None:
       self._handle.controlWrite(Panda.REQUEST_OUT, 0xdb, 0, 0, b'')
     elif bus in [Panda.GMLAN_CAN2, Panda.GMLAN_CAN3]:
       self._handle.controlWrite(Panda.REQUEST_OUT, 0xdb, 1, bus, b'')
 
+  def set_obd(self, obd):
+    # TODO: check panda type
+    self._handle.controlWrite(Panda.REQUEST_OUT, 0xdb, int(obd), 0, b'')
+
   def set_can_loopback(self, enable):
     # set can loopback mode for all buses
     self._handle.controlWrite(Panda.REQUEST_OUT, 0xe5, int(enable), 0, b'')
+
+  def set_can_enable(self, bus_num, enable):
+    # sets the can transciever enable pin
+    self._handle.controlWrite(Panda.REQUEST_OUT, 0xf4, int(bus_num), int(enable), b'')
 
   def set_can_speed_kbps(self, bus, speed):
     self._handle.controlWrite(Panda.REQUEST_OUT, 0xde, bus, int(speed*10), b'')
@@ -542,3 +576,5 @@ class Panda(object):
     msg += self.kline_ll_recv(ord(msg[1])-2, bus=bus)
     return msg
 
+  def send_heartbeat(self):
+    self._handle.controlWrite(Panda.REQUEST_OUT, 0xf3, 0, 0, b'')
