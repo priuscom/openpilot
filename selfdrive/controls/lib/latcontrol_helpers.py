@@ -6,7 +6,7 @@ _K_CURV_V = [1., 0.6]
 _K_CURV_BP = [0., 0.002]
 
 # lane width http://safety.fhwa.dot.gov/geometric/pubs/mitigationstrategies/chapter3/3_lanewidth.cfm
-_LANE_WIDTH_V = [3., 3.8]
+_LANE_WIDTH_V = [2.75, 3.8]
 
 # break points of speed
 _LANE_WIDTH_BP = [0., 31.]
@@ -59,7 +59,7 @@ def compute_path_pinv(l=50):
 
 
 def model_polyfit(points, path_pinv):
-  return np.dot(path_pinv, map(float, points))
+  return np.dot(path_pinv, [float(x) for x in points])
 
 
 def calc_desired_path(l_poly,
