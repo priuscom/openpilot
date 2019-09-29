@@ -72,7 +72,7 @@ def process_hud_alert(hud_alert, audible_alert):
     # TODO: find a way to send single chimes
     sound2 = 0  # This should be the double-beep, but 0 disables only the multiple beep
 
-  return steer, fcw, sound1, sound2
+  return steer, fcw, 0, 0
 
 
 def ipas_state_transition(steer_angle_enabled, enabled, ipas_active, ipas_reset_counter):
