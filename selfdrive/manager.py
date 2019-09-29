@@ -106,7 +106,7 @@ managed_processes = {
   "visiond": ("selfdrive/visiond", ["./visiond"]),
   "sensord": ("selfdrive/sensord", ["./sensord"]),
   "gpsd": ("selfdrive/sensord", ["./gpsd"]),
-  "updated": "selfdrive.updated",
+  #"updated": "selfdrive.updated",
   "athena": "selfdrive.athena.athenad",
 }
 android_packages = ("ai.comma.plus.offroad", "ai.comma.plus.frame")
@@ -128,8 +128,9 @@ persistent_processes = [
   'tombstoned',
   'uploader',
   'ui',
-  'updated',
-  'athena',
+  'gpsd',
+  #'updated',
+  'athena'
 ]
 
 car_started_processes = [

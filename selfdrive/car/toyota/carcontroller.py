@@ -14,7 +14,7 @@ AudibleAlert = car.CarControl.HUDControl.AudibleAlert
 
 # Accel limits
 ACCEL_HYST_GAP = 0.02  # don't change accel command for small oscilalitons within this value
-ACCEL_MAX = 1.5  # 1.5 m/s2
+ACCEL_MAX = 2.75 # 1.5 m/s2
 ACCEL_MIN = -3.0 # 3   m/s2
 ACCEL_SCALE = max(ACCEL_MAX, -ACCEL_MIN)
 
@@ -66,10 +66,10 @@ def process_hud_alert(hud_alert, audible_alert):
     steer = 1
 
   if audible_alert == AudibleAlert.chimeWarningRepeat:
-    sound1 = 1
+    sound1 = 1  # This is the longer beep, although 0 seems to disable all sounds somehow
   elif audible_alert != AudibleAlert.none:
     # TODO: find a way to send single chimes
-    sound2 = 1
+    sound2 = 0  # This should be the double-beep, but 0 disables only the multiple beep
 
   return steer, fcw, 0, 0
 
@@ -184,8 +184,8 @@ class CarController(object):
       pcm_cancel_cmd = 1
 
     # on entering standstill, send standstill request
-#    if CS.standstill and not self.last_standstill:
-     # self.standstill_req = True
+    #if CS.standstill and not self.last_standstill:
+    #  self.standstill_req = True
     if CS.pcm_acc_status != 8:
       # pcm entered standstill or it's disabled
       self.standstill_req = False

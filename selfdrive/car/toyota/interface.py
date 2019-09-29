@@ -77,15 +77,15 @@ class CarInterface(object):
       stop_and_go = True
       ret.safetyParam = 66  # see conversion factor for STEER_TORQUE_EPS in dbc file
       ret.wheelbase = 2.70
-      ret.steerRatio = 15.00   # unknown end-to-end spec
-      tire_stiffness_factor = 0.6371   # hand-tune
-      ret.mass = 3045 * CV.LB_TO_KG + std_cargo
+      ret.steerRatio = 16.00   # unknown end-to-end spec
+      tire_stiffness_factor = 1.0   # hand-tune
+      ret.mass = 3375 * CV.LB_TO_KG + std_cargo
 
       ret.lateralTuning.init('indi')
-      ret.lateralTuning.indi.innerLoopGain = 4.0
-      ret.lateralTuning.indi.outerLoopGain = 3.0
-      ret.lateralTuning.indi.timeConstant = 1.0
-      ret.lateralTuning.indi.actuatorEffectiveness = 1.0
+      ret.lateralTuning.indi.innerLoopGain = 4.75
+      ret.lateralTuning.indi.outerLoopGain = 2.0
+      ret.lateralTuning.indi.timeConstant = 3.0
+      ret.lateralTuning.indi.actuatorEffectiveness = 1.5
 
       ret.steerActuatorDelay = 0.5
       ret.steerRateCost = 0.5
@@ -381,7 +381,7 @@ class CarInterface(object):
 
     # disable on pedals rising edge or when brake is pressed and speed isn't zero
     if (ret.gasPressed and not self.gas_pressed_prev) or \
-       (ret.brakePressed and (not self.brake_pressed_prev or ret.vEgo > 0.001)):
+    (ret.brakePressed and (not self.brake_pressed_prev or ret.vEgo > 0.001)):
       events.append(create_event('pedalPressed', [ET.NO_ENTRY, ET.USER_DISABLE]))
 
     if ret.gasPressed:
