@@ -88,4 +88,10 @@ class PIController(object):
       self.saturated = False
 
     self.control = clip(control, self.neg_limit, self.pos_limit)
+    #print "pid.p"
+    #print self.p
+    #print "pid.i"
+    #print self.i
+    #print "pid.f"
+    #print self.f
     return self.control
